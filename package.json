@@ -17,7 +17,9 @@
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
     "format": "biome format --write src",
+    "check": "biome ci src tests",
     "typecheck": "tsc --noEmit",
+    "verify": "bash scripts/verify.sh",
     "prepublishOnly": "bun run build"
   },
   "keywords": [

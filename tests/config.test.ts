@@ -52,6 +52,7 @@ describe('loadConfig', () => {
   });
 
   it('falls back to defaults on parse error', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFile).mockResolvedValue('{{invalid yaml');
 
