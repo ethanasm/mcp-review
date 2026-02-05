@@ -1,0 +1,31 @@
+# mcp-git-reviewer configuration
+# Copy this file to .mcp-review.yml in your project root
+
+# Model to use for reviews (optional)
+# model: claude-sonnet-4-20250514
+
+# Focus areas for review (optional)
+# focus:
+#   - security
+#   - performance
+#   - consistency
+
+# Files/patterns to ignore (optional)
+# ignore:
+#   - "*.test.ts"
+#   - "*.snap"
+#   - "generated/**"
+#   - "vendor/**"
+
+# Project-specific conventions for the reviewer to enforce (optional)
+# conventions:
+#   - "We use barrel exports for all module directories"
+#   - "Error handling uses Result<T, E> pattern, not try/catch"
+#   - "React components use named exports, not default"
+#   - "All API endpoints must have OpenAPI documentation"
+
+# Maximum files to include in a single review (optional)
+# max_files: 20
+
+# Context lines around diff hunks (optional)
+# context_lines: 5
