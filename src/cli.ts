@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { config } from 'dotenv';
 import { loadConfig } from './config.js';
 import { resolve } from './git/resolver.js';
+import { formatUsageReport, getUsageHistory } from './history.js';
 import { createReviewer } from './reviewer.js';
 
 // Load environment variables
@@ -24,8 +25,16 @@ program
   .option('--model <model>', 'Claude model to use')
   .option('--output <format>', 'Output format: terminal, json', 'terminal')
   .option('--verbose', 'Enable verbose output')
+  .option('--usage-report', 'Display usage history and cost summary')
   .action(async (range: string | undefined, options) => {
     try {
+      // Handle usage report (no review needed)
+      if (options.usageReport) {
+        const history = await getUsageHistory();
+        console.log(formatUsageReport(history));
+        return;
+      }
+
       // Load project configuration
       const projectConfig = await loadConfig();
 

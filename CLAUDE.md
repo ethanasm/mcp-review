@@ -43,8 +43,7 @@ Context-aware, AI-powered code review at the commit level. Works with local git 
 |---------|---------|
 | `vitest` | Test runner with TypeScript support |
 | `tsx` | TypeScript execution for development |
-| `eslint` | Linting with TypeScript rules |
-| `prettier` | Code formatting |
+| `@biomejs/biome` | Linting and formatting |
 | `@types/node` | Node.js type definitions |
 
 ---
@@ -77,50 +76,50 @@ CLI → MCP Host Runtime → Tool Servers → Git Repo & File System
 
 #### Tasks
 
-- [ ] Project scaffolding
+- [x] Project scaffolding
   - [x] Directory structure
   - [x] TypeScript configuration
   - [x] Package.json with dependencies
-  - [ ] ESLint + Prettier setup
-  - [ ] Vitest configuration
+  - [x] ~~ESLint + Prettier setup~~ → Using Biome for linting & formatting
+  - [x] Vitest configuration
 
-- [ ] Git Resolver (`src/git/resolver.ts`)
-  - [ ] Parse `HEAD~N..HEAD` range syntax
-  - [ ] Handle single commit input (`abc123` → `abc123~1..abc123`)
-  - [ ] Implement `--last N` translation
-  - [ ] Implement `--since <date>` translation
-  - [ ] Handle `--staged` mode (diff index vs HEAD)
+- [x] Git Resolver (`src/git/resolver.ts`)
+  - [x] Parse `HEAD~N..HEAD` range syntax
+  - [x] Handle single commit input (`abc123` → `abc123~1..abc123`)
+  - [x] Implement `--last N` translation
+  - [x] Implement `--since <date>` translation
+  - [x] Handle `--staged` mode (diff index vs HEAD)
 
-- [ ] Basic CLI (`src/cli.ts`)
-  - [ ] Argument parsing with commander
-  - [ ] Help text and version info
-  - [ ] Route to appropriate review mode
+- [x] Basic CLI (`src/cli.ts`)
+  - [x] Argument parsing with commander
+  - [x] Help text and version info
+  - [x] Route to appropriate review mode
 
-- [ ] Git Diff Tool Server (`src/tools/git-diff/`)
-  - [ ] MCP server setup with stdio transport
-  - [ ] `get_diff` — full diff for revision range
-  - [ ] `get_diff_stats` — file change summary
-  - [ ] `get_commit_messages` — commit messages in range
+- [x] Git Diff Tool Server (`src/tools/git-diff/`)
+  - [x] MCP server setup with stdio transport
+  - [x] `get_diff` — full diff for revision range
+  - [x] `get_diff_stats` — file change summary
+  - [x] `get_commit_messages` — commit messages in range
 
-- [ ] File Context Tool Server (`src/tools/file-context/`)
-  - [ ] MCP server setup
-  - [ ] `read_file` — full file contents with line numbers
-  - [ ] `read_lines` — specific line range from file
-  - [ ] `list_directory` — directory structure
+- [x] File Context Tool Server (`src/tools/file-context/`)
+  - [x] MCP server setup
+  - [x] `read_file` — full file contents with line numbers
+  - [x] `read_lines` — specific line range from file
+  - [x] `list_directory` — directory structure
 
-- [ ] MCP Host Runtime (`src/host/`)
-  - [ ] Spawn tool server processes via stdio
-  - [ ] Capability negotiation on startup
-  - [ ] Tool registry mapping names to servers
-  - [ ] Forward tool calls from LLM to servers
-  - [ ] Basic conversation state management
+- [x] MCP Host Runtime (`src/host/`)
+  - [x] Spawn tool server processes via stdio
+  - [x] Capability negotiation on startup
+  - [x] Tool registry mapping names to servers
+  - [x] Forward tool calls from LLM to servers
+  - [x] Basic conversation state management
 
-- [ ] Basic Review Flow (`src/reviewer.ts`)
-  - [ ] Construct initial prompt with diff
-  - [ ] Send to Claude API with tool descriptions
-  - [ ] Handle tool call responses
-  - [ ] Parse structured review output
-  - [ ] Basic terminal output
+- [x] Basic Review Flow (`src/reviewer.ts`)
+  - [x] Construct initial prompt with diff
+  - [x] Send to Claude API with tool descriptions
+  - [x] Handle tool call responses
+  - [x] Parse structured review output
+  - [x] Basic terminal output
 
 #### Deliverable
 `mcp-review HEAD~1..HEAD` produces a basic review
@@ -133,36 +132,36 @@ CLI → MCP Host Runtime → Tool Servers → Git Repo & File System
 
 #### Tasks
 
-- [ ] Convention Scanner Tool (`src/tools/conventions/`)
-  - [ ] `scan_lint_config` — read ESLint, Prettier, tsconfig
-  - [ ] `find_similar_patterns` — search codebase for similar code
-  - [ ] `get_project_conventions` — read .mcp-review.yml conventions
+- [x] Convention Scanner Tool (`src/tools/conventions/`)
+  - [x] `scan_lint_config` — read Biome, ESLint, Prettier, tsconfig (scans any project's config)
+  - [x] `find_similar_patterns` — search codebase for similar code
+  - [x] `get_project_conventions` — read .mcp-review.yml conventions
 
-- [ ] Related Files Tool (`src/tools/related-files/`)
-  - [ ] `find_importers` — files that import changed file
-  - [ ] `find_exports` — exports from changed file
-  - [ ] `find_test_files` — corresponding test files
-  - [ ] `find_type_references` — TypeScript type usage
+- [x] Related Files Tool (`src/tools/related-files/`)
+  - [x] `find_importers` — files that import changed file
+  - [x] `find_exports` — exports from changed file
+  - [x] `find_test_files` — corresponding test files
+  - [x] `find_type_references` — TypeScript type usage
 
-- [ ] Context Budget Management
-  - [ ] Track cumulative token usage
-  - [ ] Signal LLM when approaching limit
-  - [ ] Implement file content caching
+- [x] Context Budget Management
+  - [x] Track cumulative token usage
+  - [x] Signal LLM when approaching limit
+  - [x] Implement file content caching
 
-- [ ] Improved Prompts (`src/prompts/`)
-  - [ ] System prompt with convention awareness
-  - [ ] Templates for different review modes
-  - [ ] Structured JSON output instructions
+- [x] Improved Prompts (`src/prompts/`)
+  - [x] System prompt with convention awareness
+  - [x] Templates for different review modes
+  - [x] Structured JSON output instructions
 
-- [ ] `--staged` Mode
-  - [ ] Diff staged index vs HEAD
-  - [ ] Pre-commit hook integration docs
+- [x] `--staged` Mode
+  - [x] Diff staged index vs HEAD
+  - [x] Pre-commit hook integration docs
 
-- [ ] Output Formatting (`src/output.ts`)
-  - [ ] Severity-based grouping (critical, suggestions, positive)
-  - [ ] Line number references with file paths
-  - [ ] Confidence indicator
-  - [ ] Summary statistics
+- [x] Output Formatting (`src/output.ts`)
+  - [x] Severity-based grouping (critical, suggestions, positive)
+  - [x] Line number references with file paths
+  - [x] Confidence indicator
+  - [x] Summary statistics
 
 #### Deliverable
 Reviews reference existing project patterns and conventions
@@ -175,36 +174,36 @@ Reviews reference existing project patterns and conventions
 
 #### Tasks
 
-- [ ] Configuration System (`src/config.ts`)
-  - [ ] Load `.mcp-review.yml` from project root
-  - [ ] Merge with defaults
-  - [ ] Validate with zod schema
-  - [ ] Support ignore patterns
-  - [ ] Custom conventions list
+- [x] Configuration System (`src/config.ts`)
+  - [x] Load `.mcp-review.yml` from project root
+  - [x] Merge with defaults
+  - [x] Validate with zod schema
+  - [x] Support ignore patterns
+  - [x] Custom conventions list
 
-- [ ] Additional CLI Options
-  - [ ] `--focus <areas>` — security, performance, consistency
-  - [ ] `--since <date>` — time-based review ranges
-  - [ ] `--model <model>` — select Claude model
-  - [ ] `--verbose` — detailed output mode
+- [x] Additional CLI Options
+  - [x] `--focus <areas>` — security, performance, consistency
+  - [x] `--since <date>` — time-based review ranges
+  - [x] `--model <model>` — select Claude model
+  - [x] `--verbose` — detailed output mode
 
-- [ ] Streaming Progress
-  - [ ] Spinner during analysis
-  - [ ] Show which files being analyzed
-  - [ ] Display context gathering progress
-  - [ ] Replace spinner with final output
+- [x] Streaming Progress
+  - [x] Spinner during analysis
+  - [x] Show which files being analyzed
+  - [x] Display context gathering progress
+  - [x] Replace spinner with final output
 
-- [ ] Error Handling
-  - [ ] Graceful degradation on tool failures
-  - [ ] Clear error messages for common issues
-  - [ ] Timeout handling for long operations
-  - [ ] API error handling with retry logic
+- [x] Error Handling
+  - [x] Graceful degradation on tool failures
+  - [x] Clear error messages for common issues
+  - [x] Timeout handling for long operations
+  - [x] API error handling with retry logic
 
-- [ ] Test Suite
-  - [ ] Unit tests for git resolver
-  - [ ] Unit tests for tool operations
-  - [ ] Integration tests for MCP protocol
-  - [ ] Fixture repos with known issues
+- [x] Test Suite
+  - [x] Unit tests for git resolver
+  - [x] Unit tests for tool operations
+  - [x] Integration tests for MCP protocol
+  - [x] Fixture repos with known issues
 
 #### Deliverable
 Polished CLI ready for real-world usage
@@ -217,25 +216,25 @@ Polished CLI ready for real-world usage
 
 #### Tasks
 
-- [ ] Watch Mode (`--watch`)
-  - [ ] Monitor for new commits
-  - [ ] Auto-review on commit
-  - [ ] Debounce rapid commits
+- [x] Watch Mode (`--watch`)
+  - [x] Monitor for new commits
+  - [x] Auto-review on commit
+  - [x] Debounce rapid commits
 
-- [ ] Review Caching
-  - [ ] Hash-based cache keys
-  - [ ] Skip unchanged files
-  - [ ] Cache invalidation on config change
+- [x] Review Caching
+  - [x] Hash-based cache keys
+  - [x] Skip unchanged files
+  - [x] Cache invalidation on config change
 
-- [ ] CI Integration
-  - [ ] `--output json` for machine-readable output
-  - [ ] Exit codes based on severity
-  - [ ] GitHub Actions example workflow
+- [x] CI Integration
+  - [x] `--output json` for machine-readable output
+  - [x] Exit codes based on severity
+  - [x] GitHub Actions example workflow
 
-- [ ] Cost & Usage Tracking
-  - [ ] Token usage reporting
-  - [ ] Cost estimation per review
-  - [ ] Usage history logging
+- [x] Cost & Usage Tracking
+  - [x] Token usage reporting
+  - [x] Cost estimation per review
+  - [x] Usage history logging
 
 - [ ] Multi-Provider Support
   - [ ] Abstract LLM interface
@@ -270,6 +269,9 @@ mcp-review --staged --focus security,performance
 
 # Watch mode — review each commit as it happens
 mcp-review --watch
+
+# View usage history and cost summary
+mcp-review --usage-report
 ```
 
 ---

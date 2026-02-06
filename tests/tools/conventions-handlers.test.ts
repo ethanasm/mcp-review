@@ -38,8 +38,8 @@ describe('handleScanLintConfig', () => {
       if (p.endsWith('tsconfig.json')) {
         return '{"compilerOptions": {"strict": true}}';
       }
-      if (p.endsWith('.prettierrc')) {
-        return '{"semi": false}';
+      if (p.endsWith('biome.json')) {
+        return '{"linter": {"enabled": true}, "formatter": {"enabled": true}}';
       }
       throw new Error('ENOENT');
     });
@@ -48,8 +48,8 @@ describe('handleScanLintConfig', () => {
 
     expect(result).toContain('tsconfig.json');
     expect(result).toContain('strict');
-    expect(result).toContain('.prettierrc');
-    expect(result).toContain('semi');
+    expect(result).toContain('biome.json');
+    expect(result).toContain('linter');
   });
 
   it('returns message when no configs found', async () => {
