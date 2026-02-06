@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadConfig, mergeConfig } from '../src/config.js';
+import { loadConfig, mergeConfig, shouldIgnoreFile } from '../src/config.js';
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
@@ -28,6 +28,7 @@ describe('loadConfig', () => {
       conventions: [],
       max_files: 20,
       context_lines: 5,
+      no_cache: false,
     });
   });
 
@@ -91,5 +92,64 @@ describe('mergeConfig', () => {
     const result = mergeConfig(base, { model: undefined });
     expect(result.model).toBe('claude-sonnet-4-20250514');
     expect(result.focus).toEqual(['perf']);
+  });
+});
+
+describe('shouldIgnoreFile', () => {
+  it('returns false for empty patterns', () => {
+    expect(shouldIgnoreFile('src/index.ts', [])).toBe(false);
+  });
+
+  it('matches exact filename pattern', () => {
+    expect(shouldIgnoreFile('src/foo.test.ts', ['*.test.ts'])).toBe(true);
+  });
+
+  it('matches extension pattern against deeply nested files', () => {
+    expect(shouldIgnoreFile('src/utils/deep/foo.test.ts', ['*.test.ts'])).toBe(true);
+  });
+
+  it('does not match when extension differs', () => {
+    expect(shouldIgnoreFile('src/foo.ts', ['*.test.ts'])).toBe(false);
+  });
+
+  it('matches ** recursive glob', () => {
+    expect(shouldIgnoreFile('dist/index.js', ['dist/**'])).toBe(true);
+    expect(shouldIgnoreFile('dist/sub/deep/file.js', ['dist/**'])).toBe(true);
+  });
+
+  it('does not match ** glob for different directory', () => {
+    expect(shouldIgnoreFile('src/index.js', ['dist/**'])).toBe(false);
+  });
+
+  it('matches single * glob in directory', () => {
+    expect(shouldIgnoreFile('src/foo.js', ['src/*.js'])).toBe(true);
+  });
+
+  it('single * does not match across path separators', () => {
+    expect(shouldIgnoreFile('src/sub/foo.js', ['src/*.js'])).toBe(false);
+  });
+
+  it('matches ? single character glob', () => {
+    expect(shouldIgnoreFile('src/a.ts', ['src/?.ts'])).toBe(true);
+    expect(shouldIgnoreFile('src/ab.ts', ['src/?.ts'])).toBe(false);
+  });
+
+  it('normalizes leading ./ from file path', () => {
+    expect(shouldIgnoreFile('./dist/foo.js', ['dist/**'])).toBe(true);
+  });
+
+  it('matches **/ prefix pattern', () => {
+    expect(shouldIgnoreFile('src/deep/nested/file.generated.ts', ['**/file.generated.ts'])).toBe(true);
+  });
+
+  it('escapes regex special characters in patterns', () => {
+    expect(shouldIgnoreFile('src/file.min.js', ['*.min.js'])).toBe(true);
+    expect(shouldIgnoreFile('src/fileminjs', ['*.min.js'])).toBe(false);
+  });
+
+  it('handles multiple patterns (match any)', () => {
+    expect(shouldIgnoreFile('dist/foo.js', ['*.test.ts', 'dist/**'])).toBe(true);
+    expect(shouldIgnoreFile('src/foo.test.ts', ['*.test.ts', 'dist/**'])).toBe(true);
+    expect(shouldIgnoreFile('src/foo.ts', ['*.test.ts', 'dist/**'])).toBe(false);
   });
 });
