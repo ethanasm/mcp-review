@@ -150,6 +150,12 @@ export interface ConversationOptions extends Config {
  *
  * Manages the LLM conversation state and orchestrates the review flow.
  */
+/** Max retries for rate-limit (429) errors. */
+const MAX_RETRIES = 3;
+
+/** Base delay in ms for exponential backoff on rate-limit errors. */
+const RETRY_BASE_DELAY_MS = 30_000;
+
 export class ConversationManager {
   private options: ConversationOptions;
   private client: Anthropic;
@@ -157,6 +163,49 @@ export class ConversationManager {
   constructor(options: ConversationOptions) {
     this.options = options;
     this.client = new Anthropic();
+  }
+
+  /**
+   * Call the Anthropic messages API with automatic retry on rate-limit errors.
+   * Uses exponential backoff: 30s, 60s, 120s.
+   */
+  private async callWithRetry(
+    params: Anthropic.MessageCreateParamsNonStreaming,
+    spinner?: Ora,
+  ): Promise<Anthropic.Message> {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await this.client.messages.create(params);
+      } catch (error) {
+        const isRateLimit =
+          error instanceof Anthropic.RateLimitError ||
+          (error instanceof Anthropic.APIError && error.status === 429);
+
+        if (!isRateLimit || attempt >= MAX_RETRIES) {
+          throw error;
+        }
+
+        // Parse retry-after header if available, otherwise use exponential backoff
+        const retryAfter =
+          error instanceof Anthropic.APIError ? error.headers?.['retry-after'] : undefined;
+        const delaySec = retryAfter ? Number.parseInt(retryAfter, 10) : 0;
+        const delayMs = delaySec > 0 ? delaySec * 1000 : RETRY_BASE_DELAY_MS * 2 ** attempt;
+
+        debug(
+          'llm',
+          `Rate limited (429). Retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(delayMs / 1000)}s`,
+        );
+
+        if (spinner) {
+          spinner.text = `Rate limited — retrying in ${Math.round(delayMs / 1000)}s...`;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    // Should never reach here, but TypeScript needs it
+    throw new Error('Exhausted retries');
   }
 
   /**
@@ -298,13 +347,16 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
     }
 
     const endFirstCall = timer('llm', `API call #${++turnNumber}`);
-    let response = await this.client.messages.create({
-      model: this.options.model,
-      max_tokens: 4096,
-      system: getSystemPrompt(this.options),
-      tools,
-      messages,
-    });
+    let response = await this.callWithRetry(
+      {
+        model: this.options.model,
+        max_tokens: 4096,
+        system: getSystemPrompt(this.options),
+        tools,
+        messages,
+      },
+      spinner,
+    );
     endFirstCall();
 
     tracker.addUsage(response.usage.input_tokens, response.usage.output_tokens);
@@ -370,13 +422,16 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
 
       // Continue conversation — drop tools if at limit so the model must produce text
       const endApiCall = timer('llm', `API call #${++turnNumber}`);
-      response = await this.client.messages.create({
-        model: this.options.model,
-        max_tokens: 4096,
-        system: getSystemPrompt(this.options),
-        ...(atLimit ? {} : { tools }),
-        messages,
-      });
+      response = await this.callWithRetry(
+        {
+          model: this.options.model,
+          max_tokens: 4096,
+          system: getSystemPrompt(this.options),
+          ...(atLimit ? {} : { tools }),
+          messages,
+        },
+        spinner,
+      );
       endApiCall();
 
       tracker.addUsage(response.usage.input_tokens, response.usage.output_tokens);
