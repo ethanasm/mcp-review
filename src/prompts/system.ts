@@ -19,10 +19,7 @@ ${config.conventions.map((c) => `- ${c}`).join('\n')}
 
 ## Your Approach
 
-1. **Gather Context First**: Before forming opinions, use the available tools to understand:
-   - The full file context (not just the diff hunks)
-   - How the changed code relates to other parts of the codebase
-   - What patterns and conventions already exist in the project
+1. **Be Efficient**: You have a limited number of tool-call rounds. Batch multiple tool calls into a single round whenever possible. Only fetch context that is directly relevant to the changed code — don't explore speculatively.
 
 2. **Be Project-Specific**: Your feedback should reference existing code patterns in THIS project, not generic best practices. If you see a pattern violation, cite where the correct pattern is used elsewhere.
 
@@ -39,9 +36,19 @@ ${config.conventions.map((c) => `- ${c}`).join('\n')}
 Prioritize feedback in these areas: ${focusAreas}
 ${conventionsSection}
 
+## Tool Usage
+
+You have access to tools that let you read full files, find importers, scan for patterns, and check project config.
+
+**Rules for efficiency:**
+- Call ALL the tools you need in a SINGLE round — do not chain one tool call per round
+- You should need at most 1–2 rounds of tool calls before producing your review
+- Only read files that appear in the diff or are directly imported/exported by changed files
+- If the diff gives you enough context, skip tool calls entirely and go straight to the review
+
 ## Output Format
 
-After gathering sufficient context, output your review as JSON in this format:
+Output your review as JSON in this exact format:
 
 \`\`\`json
 {
@@ -75,36 +82,36 @@ After gathering sufficient context, output your review as JSON in this format:
 The confidence field should be:
 - "high": You had sufficient context to give thorough feedback
 - "medium": Some context was missing but you could still provide useful feedback
-- "low": Significant context was missing; feedback may be incomplete
-
-## Tool Usage
-
-You have access to tools that let you:
-- Read full files (not just diff hunks)
-- Find files that import the changed code
-- Scan for similar patterns in the codebase
-- Check linting and project configuration
-
-Use these tools proactively to understand the context before giving feedback. Don't rely solely on the diff.`;
+- "low": Significant context was missing; feedback may be incomplete`;
 }
 
 /**
- * Initial user prompt with the diff
+ * Initial user prompt with the diff and optional pre-loaded file contents.
  */
-export function getInitialPrompt(diff: string, config: Config): string {
+export function getInitialPrompt(
+  diff: string,
+  config: Config,
+  fileContents?: { path: string; content: string }[],
+): string {
   const ignoreNote =
     config.ignore.length > 0
       ? `\n\nNote: The following files/patterns are excluded from review: ${config.ignore.join(', ')}`
       : '';
 
-  return `Please review the following code changes. Use the available tools to gather context about the project before providing your review.
+  let fileSection = '';
+  if (fileContents && fileContents.length > 0) {
+    const files = fileContents
+      .map((f) => `### ${f.path}\n\`\`\`\n${f.content}\n\`\`\``)
+      .join('\n\n');
+    fileSection = `\n\n## Full File Contents (pre-loaded)\n\nThe full contents of all changed files are included below. You do NOT need to call read_file for these.\n\n${files}`;
+  }
+
+  return `Please review the following code changes. If you need additional context beyond what's provided (e.g., importers or project conventions), call all necessary tools in a single batch. Then produce your structured JSON review.
 
 ## Diff to Review
 
 \`\`\`diff
 ${diff}
 \`\`\`
-${ignoreNote}
-
-Start by using tools to understand the context, then provide your structured review.`;
+${ignoreNote}${fileSection}`;
 }

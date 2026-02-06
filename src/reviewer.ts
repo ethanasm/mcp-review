@@ -2,9 +2,10 @@ import ora from 'ora';
 import { simpleGit } from 'simple-git';
 import { cacheReview, getCachedReview } from './cache.js';
 import type { Config } from './config.js';
-import { getDiff, getStagedDiff } from './git/commands.js';
+import { getDiff, getDiffStats, getStagedDiff, getStagedDiffStats } from './git/commands.js';
 import type { ResolvedRange } from './git/resolver.js';
 import { MCPHost } from './host/mcp-host.js';
+import { debug, setVerbose, timer } from './logger.js';
 import { renderReview } from './output.js';
 
 export interface ReviewerOptions extends Config {
@@ -55,40 +56,47 @@ export async function getLatestCommitHash(): Promise<string> {
 }
 
 export function createReviewer(options: ReviewerOptions): Reviewer {
+  setVerbose(options.verbose ?? false);
   const host = new MCPHost(options);
 
   return {
     async review(range: ResolvedRange): Promise<ReviewResult> {
-      const spinner = ora({ text: 'Starting review...', isSilent: options.outputFormat === 'json' }).start();
+      const endTotal = timer('review', 'total review');
+      const spinner = ora({ text: 'Starting tool servers...', isSilent: options.outputFormat === 'json' }).start();
 
-      await host.initialize();
+      // Initialize MCP servers and fetch diff+stats in parallel
+      const endParallelInit = timer('review', 'parallel init + diff fetch');
+      const [, diff, stats] = await Promise.all([
+        host.initialize(),
+        range.type === 'staged'
+          ? getStagedDiff()
+          : getDiff(range.from!, range.to!),
+        range.type === 'staged'
+          ? getStagedDiffStats()
+          : getDiffStats(range.from!, range.to!),
+      ]);
+      endParallelInit();
 
       try {
-        spinner.text = 'Checking cache...';
-
-        // Get diff content for cache key
-        const diff =
-          range.type === 'staged'
-            ? await getStagedDiff()
-            : await getDiff(range.from!, range.to!);
-
         // Check cache before running the review
         const cached = await getCachedReview(diff, options, options.model);
         if (cached) {
           spinner.succeed('Review loaded from cache');
           renderReview(cached, options, { fromCache: true });
+          endTotal();
           return cached;
         }
 
-        spinner.text = 'Analyzing changes...';
+        debug('review', `Diff size: ${diff.length} chars, ${stats.filesChanged} files changed`);
 
-        const result = await host.runReview(range, spinner);
+        const result = await host.runReview(range, { diff, stats }, spinner);
 
         // Store result in cache after a successful review
         await cacheReview(diff, options, options.model, result);
 
         spinner.succeed('Review complete');
         renderReview(result, options);
+        endTotal();
         return result;
       } catch (error) {
         spinner.fail('Review failed');
@@ -141,15 +149,18 @@ export function createReviewer(options: ReviewerOptions): Reviewer {
             spinner.stop();
 
             try {
-              await host.initialize();
-              const diff = await getDiff(range.from!, range.to!);
+              const [, diff, stats] = await Promise.all([
+                host.initialize(),
+                getDiff(range.from!, range.to!),
+                getDiffStats(range.from!, range.to!),
+              ]);
 
               const cached = await getCachedReview(diff, options, options.model);
               if (cached) {
                 renderReview(cached, options, { fromCache: true });
               } else {
                 const reviewSpinner = ora('Analyzing changes...').start();
-                const result = await host.runReview(range, reviewSpinner);
+                const result = await host.runReview(range, { diff, stats }, reviewSpinner);
                 await cacheReview(diff, options, options.model, result);
                 reviewSpinner.succeed('Review complete');
                 renderReview(result, options);

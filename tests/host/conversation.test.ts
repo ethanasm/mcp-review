@@ -25,21 +25,9 @@ vi.mock('../../src/usage.js', () => ({
   }),
 }));
 
-vi.mock('../../src/git/commands.js', () => ({
-  getDiff: vi.fn().mockResolvedValue('diff --git a/foo.ts b/foo.ts\n+added line'),
-  getDiffStats: vi.fn().mockResolvedValue({
-    filesChanged: 3,
-    insertions: 10,
-    deletions: 5,
-    files: ['foo.ts', 'bar.ts', 'baz.ts'],
-  }),
-  getStagedDiff: vi.fn().mockResolvedValue('staged diff'),
-  getStagedDiffStats: vi.fn().mockResolvedValue({
-    filesChanged: 1,
-    insertions: 2,
-    deletions: 1,
-    files: ['staged.ts'],
-  }),
+vi.mock('../../src/logger.js', () => ({
+  debug: vi.fn(),
+  timer: vi.fn(() => () => 0),
 }));
 
 import { ConversationManager } from '../../src/host/conversation.js';
@@ -48,6 +36,11 @@ const mockToolRegistry = {
   getAvailableTools: () => [],
   callTool: vi.fn(),
 } as any;
+
+const defaultPrefetched = {
+  diff: 'diff --git a/foo.ts b/foo.ts\n+added line',
+  stats: { filesChanged: 3, insertions: 10, deletions: 5, files: ['foo.ts', 'bar.ts', 'baz.ts'] },
+};
 
 describe('ConversationManager', () => {
   describe('focus area wiring', () => {
@@ -65,6 +58,7 @@ describe('ConversationManager', () => {
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
         mockToolRegistry,
+        defaultPrefetched,
       );
 
       // Check that the user message includes security-focused content
@@ -89,6 +83,7 @@ describe('ConversationManager', () => {
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
         mockToolRegistry,
+        defaultPrefetched,
       );
 
       const callArgs = mockCreate.mock.calls[0]![0];
@@ -112,6 +107,7 @@ describe('ConversationManager', () => {
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
         mockToolRegistry,
+        defaultPrefetched,
       );
 
       const callArgs = mockCreate.mock.calls[0]![0];
@@ -136,6 +132,7 @@ describe('ConversationManager', () => {
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
         mockToolRegistry,
+        defaultPrefetched,
       );
 
       const callArgs = mockCreate.mock.calls[0]![0];
@@ -159,6 +156,7 @@ describe('ConversationManager', () => {
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
         mockToolRegistry,
+        defaultPrefetched,
       );
 
       const callArgs = mockCreate.mock.calls[0]![0];
@@ -213,6 +211,7 @@ describe('ConversationManager', () => {
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
         mockRegistry,
+        defaultPrefetched,
         mockSpinner as any,
       );
 

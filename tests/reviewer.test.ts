@@ -11,6 +11,13 @@ vi.mock('simple-git', () => {
   };
 });
 
+// Mock logger
+vi.mock('../src/logger.js', () => ({
+  debug: vi.fn(),
+  timer: vi.fn(() => () => 0),
+  setVerbose: vi.fn(),
+}));
+
 // Mock ora
 vi.mock('ora', () => {
   const mockSpinner = {

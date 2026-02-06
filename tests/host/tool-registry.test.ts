@@ -173,6 +173,141 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('tool result caching', () => {
+    it('returns cached result for identical cacheable tool calls', async () => {
+      let callCount = 0;
+      const transport = {
+        request: vi.fn().mockImplementation(async (method: string) => {
+          if (method === 'tools/list') {
+            return { tools: [{ name: 'read_file', description: 'Read a file', inputSchema: {} }] };
+          }
+          callCount++;
+          return {
+            content: [{ type: 'text', text: `response ${callCount}` }],
+          };
+        }),
+        stop: vi.fn().mockResolvedValue(undefined),
+      } as unknown as StdioTransport;
+
+      await registry.registerServer('file-context', transport);
+
+      const result1 = await registry.callTool({ name: 'read_file', arguments: { path: '/foo.ts' } });
+      const result2 = await registry.callTool({ name: 'read_file', arguments: { path: '/foo.ts' } });
+
+      expect(result1.content).toBe('response 1');
+      expect(result2.content).toBe('response 1'); // Same cached result
+      expect(callCount).toBe(1); // Transport only called once
+    });
+
+    it('does not cache results for different arguments', async () => {
+      let callCount = 0;
+      const transport = {
+        request: vi.fn().mockImplementation(async (method: string) => {
+          if (method === 'tools/list') {
+            return { tools: [{ name: 'read_file', description: 'Read a file', inputSchema: {} }] };
+          }
+          callCount++;
+          return {
+            content: [{ type: 'text', text: `response ${callCount}` }],
+          };
+        }),
+        stop: vi.fn().mockResolvedValue(undefined),
+      } as unknown as StdioTransport;
+
+      await registry.registerServer('file-context', transport);
+
+      const result1 = await registry.callTool({ name: 'read_file', arguments: { path: '/foo.ts' } });
+      const result2 = await registry.callTool({ name: 'read_file', arguments: { path: '/bar.ts' } });
+
+      expect(result1.content).toBe('response 1');
+      expect(result2.content).toBe('response 2');
+      expect(callCount).toBe(2);
+    });
+
+    it('does not cache non-cacheable tools', async () => {
+      let callCount = 0;
+      const transport = {
+        request: vi.fn().mockImplementation(async (method: string) => {
+          if (method === 'tools/list') {
+            return { tools: [{ name: 'find_similar_patterns', description: 'Search patterns', inputSchema: {} }] };
+          }
+          callCount++;
+          return {
+            content: [{ type: 'text', text: `response ${callCount}` }],
+          };
+        }),
+        stop: vi.fn().mockResolvedValue(undefined),
+      } as unknown as StdioTransport;
+
+      await registry.registerServer('conventions', transport);
+
+      const result1 = await registry.callTool({ name: 'find_similar_patterns', arguments: { pattern: 'foo' } });
+      const result2 = await registry.callTool({ name: 'find_similar_patterns', arguments: { pattern: 'foo' } });
+
+      expect(result1.content).toBe('response 1');
+      expect(result2.content).toBe('response 2');
+      expect(callCount).toBe(2);
+    });
+
+    it('does not cache error results', async () => {
+      let callCount = 0;
+      const transport = {
+        request: vi.fn().mockImplementation(async (method: string) => {
+          if (method === 'tools/list') {
+            return { tools: [{ name: 'read_file', description: 'Read a file', inputSchema: {} }] };
+          }
+          callCount++;
+          if (callCount === 1) {
+            return {
+              content: [{ type: 'text', text: 'error occurred' }],
+              isError: true,
+            };
+          }
+          return {
+            content: [{ type: 'text', text: 'success' }],
+          };
+        }),
+        stop: vi.fn().mockResolvedValue(undefined),
+      } as unknown as StdioTransport;
+
+      await registry.registerServer('file-context', transport);
+
+      const result1 = await registry.callTool({ name: 'read_file', arguments: { path: '/fail.ts' } });
+      const result2 = await registry.callTool({ name: 'read_file', arguments: { path: '/fail.ts' } });
+
+      expect(result1.isError).toBe(true);
+      expect(result2.content).toBe('success');
+      expect(callCount).toBe(2); // Called twice because error wasn't cached
+    });
+
+    it('clears cache on shutdown', async () => {
+      let callCount = 0;
+      const transport = {
+        request: vi.fn().mockImplementation(async (method: string) => {
+          if (method === 'tools/list') {
+            return { tools: [{ name: 'read_file', description: 'Read a file', inputSchema: {} }] };
+          }
+          callCount++;
+          return {
+            content: [{ type: 'text', text: `response ${callCount}` }],
+          };
+        }),
+        stop: vi.fn().mockResolvedValue(undefined),
+      } as unknown as StdioTransport;
+
+      await registry.registerServer('file-context', transport);
+
+      await registry.callTool({ name: 'read_file', arguments: { path: '/foo.ts' } });
+      await registry.shutdown();
+
+      // Re-register and call again — should not use old cache
+      await registry.registerServer('file-context', transport);
+      const result = await registry.callTool({ name: 'read_file', arguments: { path: '/foo.ts' } });
+
+      expect(result.content).toBe('response 2'); // New response, not cached
+    });
+  });
+
   describe('shutdown', () => {
     it('clears all registered tools', async () => {
       registry.registerToolManually('test', {

@@ -40,7 +40,8 @@ describe('MCP Protocol Integration', { timeout: 30000 }, () => {
     beforeAll(async () => {
       // Spawn the git-diff server with cwd set to the fixture repo
       // so simple-git() picks up the correct working directory
-      transport = new StdioTransport('npx', ['tsx', SERVER_ENTRY], { cwd: repo.path });
+      const tsxBin = resolve(__dirname, '../../node_modules/.bin/tsx');
+      transport = new StdioTransport(tsxBin, [SERVER_ENTRY], { cwd: repo.path });
 
       // Suppress stderr noise (e.g. npx "will be installed" warnings)
       transport.on('error', () => {});

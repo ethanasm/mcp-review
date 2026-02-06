@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  handleGetFileContext,
   handleListDirectory,
   handleReadFile,
   handleReadLines,
@@ -142,5 +143,88 @@ describe('handleListDirectory', () => {
 
     expect(result).toContain('level0/');
     // With max_depth 1, readdir is called for root only, then stops
+  });
+});
+
+describe('handleGetFileContext', () => {
+  it('returns file contents with line numbers', async () => {
+    vi.mocked(readFile).mockResolvedValue('const a = 1;\nexport const b = 2;\n');
+
+    const result = await handleGetFileContext({ path: '/project/src/foo.ts' });
+
+    expect(result).toContain('## File Contents');
+    expect(result).toContain('1 | const a = 1;');
+    expect(result).toContain('2 | export const b = 2;');
+  });
+
+  it('extracts exports', async () => {
+    vi.mocked(readFile).mockResolvedValue(
+      'export const FOO = 1;\nexport function bar() {}\nconst internal = 3;\n',
+    );
+
+    const result = await handleGetFileContext({ path: '/project/src/utils.ts' });
+
+    expect(result).toContain('## Exports (2)');
+    expect(result).toContain('export const FOO');
+    expect(result).toContain('export function bar');
+    // The exports section should only contain export lines, not internal ones
+    const exportSection = result.split('## Exports')[1]!;
+    expect(exportSection).not.toContain('const internal');
+  });
+
+  it('includes importers section when requested with project_root', async () => {
+    // The readFile mock returns content for any path — the important thing
+    // is that the importer section appears in the output when requested.
+    vi.mocked(readFile).mockImplementation(async (path) => {
+      const p = String(path);
+      if (p === '/project/src/target.ts') {
+        return 'export const foo = 42;\n';
+      }
+      if (p.endsWith('consumer.ts')) {
+        return "import { foo } from './target.js';\nconsole.log(foo);\n";
+      }
+      return 'const x = 1;\n';
+    });
+
+    vi.mocked(readdir)
+      .mockResolvedValueOnce([
+        mockDirent('src', true),
+      ] as never)
+      .mockResolvedValueOnce([
+        mockDirent('target.ts', false),
+        mockDirent('consumer.ts', false),
+      ] as never);
+
+    const result = await handleGetFileContext({
+      path: '/project/src/target.ts',
+      project_root: '/project',
+      include_importers: true,
+    });
+
+    // Should have the Imported By section regardless of whether it found matches
+    expect(result).toContain('## Imported By');
+  });
+
+  it('skips importers section when include_importers is false', async () => {
+    vi.mocked(readFile).mockResolvedValue('export const foo = 42;\n');
+
+    const result = await handleGetFileContext({
+      path: '/project/src/target.ts',
+      include_importers: false,
+    });
+
+    expect(result).not.toContain('## Imported By');
+  });
+
+  it('skips importers section when no project_root provided', async () => {
+    vi.mocked(readFile).mockResolvedValue('export const foo = 42;\n');
+
+    const result = await handleGetFileContext({
+      path: '/project/src/target.ts',
+      include_importers: true,
+      // no project_root
+    });
+
+    expect(result).not.toContain('## Imported By');
   });
 });
