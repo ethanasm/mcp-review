@@ -71,6 +71,79 @@ function describeToolCalls(blocks: Anthropic.ToolUseBlock[]): string {
  */
 const MAX_TOOL_ROUNDS = 2;
 
+/**
+ * Approximate max tokens to allow for the diff portion of the prompt.
+ * Leaves headroom for the system prompt (~2k), tool schemas (~3k),
+ * pre-loaded file contents (~20k), and model response (4k).
+ * Claude's context is 200k tokens; we target ~120k for the diff.
+ */
+const MAX_DIFF_TOKENS = 120_000;
+
+/** Rough chars-per-token ratio for estimating token counts. */
+const CHARS_PER_TOKEN = 4;
+
+/**
+ * Truncate a unified diff to fit within a token budget.
+ *
+ * Strategy: split by file (lines starting with "diff --git"), keep as many
+ * complete per-file diffs as fit, then truncate the remainder. Always
+ * preserve at least the file header lines so the model knows which files
+ * changed even if the hunks are dropped.
+ */
+export interface TruncateResult {
+  diff: string;
+  omittedFiles: number;
+}
+
+export function truncateDiff(diff: string, maxTokens: number = MAX_DIFF_TOKENS): TruncateResult {
+  const maxChars = maxTokens * CHARS_PER_TOKEN;
+
+  if (diff.length <= maxChars) {
+    return { diff, omittedFiles: 0 };
+  }
+
+  // Split into per-file sections
+  const fileSections: string[] = [];
+  let current = '';
+  for (const line of diff.split('\n')) {
+    if (line.startsWith('diff --git ') && current.length > 0) {
+      fileSections.push(current);
+      current = '';
+    }
+    current += `${line}\n`;
+  }
+  if (current.length > 0) {
+    fileSections.push(current);
+  }
+
+  // Greedily include complete file diffs until we run out of budget
+  let result = '';
+  let included = 0;
+  for (const section of fileSections) {
+    if (result.length + section.length > maxChars && included > 0) {
+      break;
+    }
+    result += section;
+    included++;
+  }
+
+  const omitted = fileSections.length - included;
+  if (omitted > 0) {
+    // List the omitted files (header lines only)
+    const omittedHeaders = fileSections
+      .slice(included)
+      .map((s) => {
+        const headerLine = s.split('\n').find((l) => l.startsWith('diff --git '));
+        return headerLine ?? '(unknown file)';
+      })
+      .join('\n');
+
+    result += `\n\n--- DIFF TRUNCATED ---\n${omitted} additional file(s) omitted to fit within context limits:\n${omittedHeaders}\n\nUse the get_diff tool with a specific file path to review omitted files.\n`;
+  }
+
+  return { diff: result, omittedFiles: omitted };
+}
+
 export interface ConversationOptions extends Config {
   verbose?: boolean;
 }
@@ -171,16 +244,34 @@ export class ConversationManager {
     spinner?: Ora,
   ): Promise<ReviewResult> {
     const tracker = createUsageTracker(this.options.model);
-    const { diff, stats } = prefetched;
+    const { stats } = prefetched;
+
+    // Truncate diff if it would exceed the context window
+    const truncated = truncateDiff(prefetched.diff);
+    const diff = truncated.diff;
+    const wasTruncated = truncated.omittedFiles > 0;
+
+    if (wasTruncated) {
+      debug(
+        'review',
+        `Diff truncated: ${prefetched.diff.length} → ${diff.length} chars, ${truncated.omittedFiles} file(s) omitted`,
+      );
+    }
 
     if (spinner) {
       spinner.text = `Loading ${stats.filesChanged} changed file${stats.filesChanged === 1 ? '' : 's'}...`;
     }
 
     // Pre-load changed file contents to include in the prompt
-    const endPreload = timer('review', 'preload file contents');
-    const fileContents = await this.preloadFileContents(stats);
-    endPreload();
+    // Skip pre-loading when the diff is already large to stay within limits
+    let fileContents: { path: string; content: string }[] = [];
+    if (!wasTruncated) {
+      const endPreload = timer('review', 'preload file contents');
+      fileContents = await this.preloadFileContents(stats);
+      endPreload();
+    } else {
+      debug('review', 'Skipping file pre-load: diff was truncated to fit context window');
+    }
 
     // Get available tools
     const tools = toolRegistry.getAvailableTools().map((t) => ({
@@ -307,6 +398,9 @@ export class ConversationManager {
 
     const result = this.parseReviewOutput(textContent.text, stats);
     result.tokenUsage = tracker.getTotal();
+    if (wasTruncated) {
+      result.truncated = { omittedFiles: truncated.omittedFiles };
+    }
     return result;
   }
 

@@ -35,7 +35,7 @@ vi.mock('../../src/logger.js', () => ({
   timer: vi.fn(() => () => 0),
 }));
 
-import { ConversationManager } from '../../src/host/conversation.js';
+import { ConversationManager, truncateDiff } from '../../src/host/conversation.js';
 
 const mockToolRegistry = {
   getAvailableTools: () => [],
@@ -167,6 +167,56 @@ describe('ConversationManager', () => {
       const callArgs = mockCreate.mock.calls[0]![0];
       const userMessage = callArgs.messages[0].content;
       expect(userMessage).toContain('Please review the following code changes');
+    });
+  });
+
+  describe('truncateDiff', () => {
+    it('returns diff unchanged when under limit', () => {
+      const diff = 'diff --git a/foo.ts b/foo.ts\n+added line\n';
+      const result = truncateDiff(diff, 1000);
+      expect(result.diff).toBe(diff);
+      expect(result.omittedFiles).toBe(0);
+    });
+
+    it('truncates when diff exceeds token limit', () => {
+      // Each file section is ~50 chars. With maxTokens=10 (40 chars), only 1 fits.
+      const diff = [
+        'diff --git a/a.ts b/a.ts\n+line a content here\n',
+        'diff --git a/b.ts b/b.ts\n+line b content here\n',
+        'diff --git a/c.ts b/c.ts\n+line c content here\n',
+      ].join('');
+
+      const result = truncateDiff(diff, 10); // 10 tokens = 40 chars
+      expect(result.diff).toContain('diff --git a/a.ts');
+      expect(result.diff).toContain('DIFF TRUNCATED');
+      expect(result.diff).toContain('2 additional file(s) omitted');
+      expect(result.diff).toContain('diff --git a/b.ts b/b.ts');
+      expect(result.diff).toContain('diff --git a/c.ts b/c.ts');
+      expect(result.omittedFiles).toBe(2);
+    });
+
+    it('lists omitted file headers in truncation notice', () => {
+      const diff = [
+        'diff --git a/small.ts b/small.ts\n+x\n',
+        `diff --git a/big.ts b/big.ts\n${'+y\n'.repeat(100)}`,
+        'diff --git a/other.ts b/other.ts\n+z\n',
+      ].join('');
+
+      // Set limit so only first file fits
+      const result = truncateDiff(diff, 10);
+      expect(result.diff).toContain('diff --git a/big.ts b/big.ts');
+      expect(result.diff).toContain('diff --git a/other.ts b/other.ts');
+      expect(result.diff).toContain('get_diff tool');
+      expect(result.omittedFiles).toBe(2);
+    });
+
+    it('includes at least one file even if it exceeds budget', () => {
+      const diff = `diff --git a/huge.ts b/huge.ts\n${'+line\n'.repeat(100)}`;
+      const result = truncateDiff(diff, 1); // 1 token = 4 chars, way under
+      // Should still include the first file
+      expect(result.diff).toContain('diff --git a/huge.ts');
+      expect(result.diff).not.toContain('DIFF TRUNCATED');
+      expect(result.omittedFiles).toBe(0);
     });
   });
 

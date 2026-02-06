@@ -76,6 +76,10 @@ jobs:
                 body += '\n';
               }
 
+              if (review.truncated) {
+                body += `> **Note:** The diff was too large for full analysis. ${review.truncated.omittedFiles} file(s) were omitted from the review.\n\n`;
+              }
+
               body += `\n*Confidence: ${review.confidence} | ${review.stats.filesChanged} files, +${review.stats.insertions}/-${review.stats.deletions}*`;
 
               await github.rest.issues.createComment({
