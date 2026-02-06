@@ -69,8 +69,8 @@ describe('ConversationManager', () => {
       // Check that the user message includes security-focused content
       const callArgs = mockCreate.mock.calls[0]![0];
       const userMessage = callArgs.messages[0].content;
-      expect(userMessage).toContain('security-focused code review');
       expect(userMessage).toContain('Input validation');
+      expect(userMessage).toContain('Focus Areas');
     });
 
     it('uses performance template when focus includes performance', async () => {
@@ -93,8 +93,8 @@ describe('ConversationManager', () => {
 
       const callArgs = mockCreate.mock.calls[0]![0];
       const userMessage = callArgs.messages[0].content;
-      expect(userMessage).toContain('performance-focused code review');
       expect(userMessage).toContain('N+1 queries');
+      expect(userMessage).toContain('Focus Areas');
     });
 
     it('combines security and performance templates when both are focused', async () => {
@@ -117,8 +117,8 @@ describe('ConversationManager', () => {
 
       const callArgs = mockCreate.mock.calls[0]![0];
       const userMessage = callArgs.messages[0].content;
-      expect(userMessage).toContain('security-focused code review');
-      expect(userMessage).toContain('performance-focused code review');
+      expect(userMessage).toContain('Input validation');
+      expect(userMessage).toContain('N+1 queries');
       expect(userMessage).toContain('Analyzing 3 files');
     });
 

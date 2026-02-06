@@ -8,11 +8,7 @@ import type { DiffStats } from '../git/commands.js';
 import type { ResolvedRange } from '../git/resolver.js';
 import { debug, timer } from '../logger.js';
 import { getInitialPrompt, getSystemPrompt } from '../prompts/system.js';
-import {
-  type TemplateContext,
-  getPerformanceReviewPrompt,
-  getSecurityReviewPrompt,
-} from '../prompts/templates.js';
+import { getFocusInstructions } from '../prompts/templates.js';
 import type { ReviewResult } from '../reviewer.js';
 import { createUsageTracker } from '../usage.js';
 import type { ToolRegistry } from './tool-registry.js';
@@ -74,10 +70,11 @@ const MAX_TOOL_ROUNDS = 2;
 /**
  * Approximate max tokens to allow for the diff portion of the prompt.
  * Leaves headroom for the system prompt (~2k), tool schemas (~3k),
- * pre-loaded file contents (~20k), and model response (4k).
- * Claude's context is 200k tokens; we target ~120k for the diff.
+ * pre-loaded file contents (~20k), focus instructions (~1k),
+ * and model response (4k max_tokens).
+ * Claude's context is 200k tokens; we target ~100k for the diff.
  */
-const MAX_DIFF_TOKENS = 120_000;
+const MAX_DIFF_TOKENS = 100_000;
 
 /** Rough chars-per-token ratio for estimating token counts. */
 const CHARS_PER_TOKEN = 4;
@@ -172,20 +169,25 @@ export class ConversationManager {
   ): string {
     const focusAreas = this.options.focus;
 
+    // Collect focus-area instructions (without duplicating the diff)
     if (focusAreas.length > 0) {
-      const templateContext: TemplateContext = { diff, focusAreas };
-      const sections: string[] = [];
+      const instructions = focusAreas.map(getFocusInstructions).filter(Boolean);
 
-      for (const area of focusAreas) {
-        if (area === 'security') {
-          sections.push(getSecurityReviewPrompt(templateContext));
-        } else if (area === 'performance') {
-          sections.push(getPerformanceReviewPrompt(templateContext));
-        }
-      }
+      if (instructions.length > 0) {
+        const focusSection = instructions.join('\n\n---\n\n');
+        return `Please review the following code changes with specific focus on the areas listed below.
 
-      if (sections.length > 0) {
-        return `${sections.join('\n\n---\n\n')}\n\nAnalyzing ${stats.filesChanged} files. Use the available tools to understand the context, then provide your structured review.`;
+## Diff to Review
+
+\`\`\`diff
+${diff}
+\`\`\`
+
+## Focus Areas
+
+${focusSection}
+
+Analyzing ${stats.filesChanged} files. Use the available tools to understand the context, then provide your structured review.`;
       }
     }
 
