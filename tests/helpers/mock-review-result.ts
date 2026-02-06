@@ -1,6 +1,6 @@
-import type { ReviewFinding, ReviewResult } from '../../src/reviewer.js';
-import type { DiffStats } from '../../src/git/commands.js';
 import type { Config } from '../../src/config.js';
+import type { DiffStats } from '../../src/git/commands.js';
+import type { ReviewFinding, ReviewResult } from '../../src/reviewer.js';
 
 /**
  * Create a mock ReviewResult with sensible defaults.

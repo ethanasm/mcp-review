@@ -13,13 +13,8 @@ vi.mock('../../src/git/commands.js', () => ({
   getCommitMessages: vi.fn(),
 }));
 
-const {
-  getDiff,
-  getDiffStats,
-  getStagedDiff,
-  getStagedDiffStats,
-  getCommitMessages,
-} = await import('../../src/git/commands.js');
+const { getDiff, getDiffStats, getStagedDiff, getStagedDiffStats, getCommitMessages } =
+  await import('../../src/git/commands.js');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -32,7 +27,10 @@ describe('handleGetDiff', () => {
     const result = await handleGetDiff({ range: 'HEAD~1..HEAD' });
 
     expect(result).toContain('diff --git');
-    expect(getDiff).toHaveBeenCalledWith('HEAD~1', 'HEAD', { file: undefined, contextLines: undefined });
+    expect(getDiff).toHaveBeenCalledWith('HEAD~1', 'HEAD', {
+      file: undefined,
+      contextLines: undefined,
+    });
   });
 
   it('returns staged diff when range is "staged"', async () => {

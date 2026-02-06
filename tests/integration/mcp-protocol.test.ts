@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { StdioTransport } from '../../src/host/transport.js';
-import { createFixtureRepo, type FixtureRepo } from '../fixtures/setup.js';
+import { type FixtureRepo, createFixtureRepo } from '../fixtures/setup.js';
 
 /**
  * MCP Protocol Integration Tests

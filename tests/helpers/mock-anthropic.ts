@@ -152,9 +152,7 @@ export function createMockAnthropicClient(options: MockAnthropicOptions = {}) {
     const responseIndex = Math.min(callIndex, responses.length - 1);
     const response = responses[responseIndex];
     if (!response) {
-      throw new Error(
-        `MockAnthropicClient: no response configured for call index ${callIndex}`,
-      );
+      throw new Error(`MockAnthropicClient: no response configured for call index ${callIndex}`);
     }
     callIndex++;
 

@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createFixtureRepo, type FixtureRepo } from '../fixtures/setup.js';
+import type { ReviewResult } from '../../src/reviewer.js';
+import { type FixtureRepo, createFixtureRepo } from '../fixtures/setup.js';
 import {
   createMockAnthropicClient,
   createTextBlock,
   wrapReviewJson,
 } from '../helpers/mock-anthropic.js';
 import { createMockReviewResult } from '../helpers/mock-review-result.js';
-import type { ReviewResult } from '../../src/reviewer.js';
 
 /**
  * Review Flow Integration Tests
@@ -93,7 +93,11 @@ describe('Review Flow Integration', { timeout: 30000 }, () => {
             usage: { input_tokens: 100, output_tokens: 50 },
           },
           {
-            content: [createTextBlock(wrapReviewJson({ critical: [], suggestions: [], positive: [], confidence: 'low' }))],
+            content: [
+              createTextBlock(
+                wrapReviewJson({ critical: [], suggestions: [], positive: [], confidence: 'low' }),
+              ),
+            ],
             stop_reason: 'end_turn',
             usage: { input_tokens: 200, output_tokens: 100 },
           },

@@ -72,7 +72,11 @@ describe('handleReadLines', () => {
   it('handles out-of-range start_line', async () => {
     vi.mocked(readFile).mockResolvedValue('a\nb\n');
 
-    const result = await handleReadLines({ path: '/project/foo.ts', start_line: 100, end_line: 200 });
+    const result = await handleReadLines({
+      path: '/project/foo.ts',
+      start_line: 100,
+      end_line: 200,
+    });
 
     expect(result).toContain('out of range');
   });
@@ -91,13 +95,8 @@ describe('handleListDirectory', () => {
   it('lists directory tree', async () => {
     vi.mocked(stat).mockResolvedValue({ isDirectory: () => true } as any);
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-        mockDirent('package.json', false),
-      ] as never)
-      .mockResolvedValueOnce([
-        mockDirent('index.ts', false),
-      ] as never);
+      .mockResolvedValueOnce([mockDirent('src', true), mockDirent('package.json', false)] as never)
+      .mockResolvedValueOnce([mockDirent('index.ts', false)] as never);
 
     const result = await handleListDirectory({ path: '/project' });
 
@@ -116,13 +115,14 @@ describe('handleListDirectory', () => {
 
   it('skips node_modules and dist', async () => {
     vi.mocked(stat).mockResolvedValue({ isDirectory: () => true } as any);
-    vi.mocked(readdir).mockResolvedValueOnce([
-      mockDirent('node_modules', true),
-      mockDirent('dist', true),
-      mockDirent('src', true),
-      mockDirent('.git', true),
-    ] as never)
-    .mockResolvedValueOnce([] as never); // src contents
+    vi.mocked(readdir)
+      .mockResolvedValueOnce([
+        mockDirent('node_modules', true),
+        mockDirent('dist', true),
+        mockDirent('src', true),
+        mockDirent('.git', true),
+      ] as never)
+      .mockResolvedValueOnce([] as never); // src contents
 
     const result = await handleListDirectory({ path: '/project' });
 
@@ -134,10 +134,9 @@ describe('handleListDirectory', () => {
 
   it('respects max_depth', async () => {
     vi.mocked(stat).mockResolvedValue({ isDirectory: () => true } as any);
-    vi.mocked(readdir).mockResolvedValueOnce([
-      mockDirent('level0', true),
-    ] as never)
-    .mockResolvedValueOnce([] as never);
+    vi.mocked(readdir)
+      .mockResolvedValueOnce([mockDirent('level0', true)] as never)
+      .mockResolvedValueOnce([] as never);
 
     const result = await handleListDirectory({ path: '/project', max_depth: 1 });
 
@@ -187,9 +186,7 @@ describe('handleGetFileContext', () => {
     });
 
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
       .mockResolvedValueOnce([
         mockDirent('target.ts', false),
         mockDirent('consumer.ts', false),
