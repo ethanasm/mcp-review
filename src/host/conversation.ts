@@ -1,9 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { Ora } from 'ora';
 import type { Config } from '../config.js';
 import { getDiff, getDiffStats, getStagedDiff, getStagedDiffStats } from '../git/commands.js';
 import type { ResolvedRange } from '../git/resolver.js';
 import { getInitialPrompt, getSystemPrompt } from '../prompts/system.js';
+import {
+  getPerformanceReviewPrompt,
+  getSecurityReviewPrompt,
+  type TemplateContext,
+} from '../prompts/templates.js';
 import type { ReviewResult } from '../reviewer.js';
+import { createUsageTracker } from '../usage.js';
 import type { ToolRegistry } from './tool-registry.js';
 
 export interface ConversationOptions extends Config {
@@ -25,9 +32,38 @@ export class ConversationManager {
   }
 
   /**
+   * Build the user prompt, incorporating focus-area templates when configured.
+   */
+  private buildInitialPrompt(diff: string, stats: { filesChanged: number }): string {
+    const focusAreas = this.options.focus;
+
+    if (focusAreas.length > 0) {
+      const templateContext: TemplateContext = { diff, focusAreas };
+      const sections: string[] = [];
+
+      for (const area of focusAreas) {
+        if (area === 'security') {
+          sections.push(getSecurityReviewPrompt(templateContext));
+        } else if (area === 'performance') {
+          sections.push(getPerformanceReviewPrompt(templateContext));
+        }
+      }
+
+      if (sections.length > 0) {
+        return sections.join('\n\n---\n\n') +
+          `\n\nAnalyzing ${stats.filesChanged} files. Use the available tools to understand the context, then provide your structured review.`;
+      }
+    }
+
+    return getInitialPrompt(diff, this.options);
+  }
+
+  /**
    * Run a review conversation
    */
-  async runReview(range: ResolvedRange, toolRegistry: ToolRegistry): Promise<ReviewResult> {
+  async runReview(range: ResolvedRange, toolRegistry: ToolRegistry, spinner?: Ora): Promise<ReviewResult> {
+    const tracker = createUsageTracker(this.options.model);
+
     // Get diff and stats
     const [diff, stats] =
       range.type === 'staged'
@@ -37,6 +73,10 @@ export class ConversationManager {
             getDiffStats(range.from!, range.to!),
           ]);
 
+    if (spinner) {
+      spinner.text = `Analyzing ${stats.filesChanged} files...`;
+    }
+
     // Get available tools
     const tools = toolRegistry.getAvailableTools().map((t) => ({
       name: t.name,
@@ -44,11 +84,11 @@ export class ConversationManager {
       input_schema: t.inputSchema as Anthropic.Tool['input_schema'],
     }));
 
-    // Build initial messages
+    // Build initial messages using focus-aware prompt
     const messages: Anthropic.MessageParam[] = [
       {
         role: 'user',
-        content: getInitialPrompt(diff, this.options),
+        content: this.buildInitialPrompt(diff, stats),
       },
     ];
 
@@ -61,8 +101,14 @@ export class ConversationManager {
       messages,
     });
 
+    tracker.addUsage(response.usage.input_tokens, response.usage.output_tokens);
+
     // Handle tool calls in a loop
     while (response.stop_reason === 'tool_use') {
+      if (spinner) {
+        spinner.text = 'Gathering context...';
+      }
+
       const assistantContent = response.content;
       messages.push({ role: 'assistant', content: assistantContent });
 
@@ -85,6 +131,10 @@ export class ConversationManager {
 
       messages.push({ role: 'user', content: toolResults });
 
+      if (spinner) {
+        spinner.text = 'Generating review...';
+      }
+
       // Continue conversation
       response = await this.client.messages.create({
         model: this.options.model,
@@ -93,6 +143,8 @@ export class ConversationManager {
         tools,
         messages,
       });
+
+      tracker.addUsage(response.usage.input_tokens, response.usage.output_tokens);
     }
 
     // Parse final response
@@ -101,7 +153,9 @@ export class ConversationManager {
       throw new Error('No text response from LLM');
     }
 
-    return this.parseReviewOutput(textContent.text, stats);
+    const result = this.parseReviewOutput(textContent.text, stats);
+    result.tokenUsage = tracker.getTotal();
+    return result;
   }
 
   /**

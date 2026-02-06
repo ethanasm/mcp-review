@@ -1,6 +1,9 @@
+import { ToolServerError } from '../errors.js';
+import type { StdioTransport } from './transport.js';
+
 export interface ToolServer {
   name: string;
-  process: unknown; // Will be ChildProcess
+  transport: StdioTransport;
   capabilities: ToolCapability[];
 }
 
@@ -20,87 +23,65 @@ export interface ToolCallResult {
   isError?: boolean;
 }
 
+interface McpToolsListResponse {
+  tools: Array<{
+    name: string;
+    description?: string;
+    inputSchema?: Record<string, unknown>;
+  }>;
+}
+
+interface McpContentBlock {
+  type: string;
+  text?: string;
+}
+
+interface McpToolCallResponse {
+  content: McpContentBlock[];
+  isError?: boolean;
+}
+
+export interface ServerConfig {
+  name: string;
+  path: string;
+}
+
 /**
  * Tool Registry
  *
  * Maps tool names to their MCP servers and handles routing of tool calls.
+ * Supports two modes:
+ * - Live mode: spawns real tool server processes and routes via StdioTransport
+ * - Standalone mode: tools registered manually with registerToolManually() for testing
  */
 export class ToolRegistry {
   private servers: Map<string, ToolServer> = new Map();
   private toolToServer: Map<string, string> = new Map();
 
-  async initialize(): Promise<void> {
-    // TODO: Start each tool server process and perform capability negotiation
-    // For now, we'll register the expected tools
+  /**
+   * Register a tool server with an active transport.
+   * Performs capability negotiation by calling tools/list on the server.
+   */
+  async registerServer(name: string, transport: StdioTransport): Promise<void> {
+    const response = (await transport.request('tools/list', {})) as McpToolsListResponse;
 
-    // Git Diff Tool
-    this.registerTool('git-diff', {
-      name: 'get_diff',
-      description: 'Get the full git diff for the review scope',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          range: { type: 'string', description: 'Git revision range' },
-          file_path: { type: 'string', description: 'Optional: limit diff to specific file' },
-          context_lines: { type: 'number', description: 'Context lines around changes' },
-        },
-        required: ['range'],
-      },
-    });
+    const capabilities: ToolCapability[] = (response.tools ?? []).map((tool) => ({
+      name: tool.name,
+      description: tool.description ?? '',
+      inputSchema: tool.inputSchema ?? {},
+    }));
 
-    this.registerTool('git-diff', {
-      name: 'get_diff_stats',
-      description: 'Get file change summary (files changed, insertions, deletions)',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          range: { type: 'string', description: 'Git revision range' },
-        },
-        required: ['range'],
-      },
-    });
+    this.servers.set(name, { name, transport, capabilities });
 
-    this.registerTool('git-diff', {
-      name: 'get_commit_messages',
-      description: 'Get commit messages in the review range to understand developer intent',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          range: { type: 'string', description: 'Git revision range' },
-        },
-        required: ['range'],
-      },
-    });
-
-    // File Context Tool
-    this.registerTool('file-context', {
-      name: 'read_file',
-      description: 'Read full file contents with line numbers',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', description: 'Path to the file' },
-        },
-        required: ['path'],
-      },
-    });
-
-    this.registerTool('file-context', {
-      name: 'read_lines',
-      description: 'Read specific line range from a file',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          path: { type: 'string', description: 'Path to the file' },
-          start_line: { type: 'number', description: 'Starting line number' },
-          end_line: { type: 'number', description: 'Ending line number' },
-        },
-        required: ['path', 'start_line', 'end_line'],
-      },
-    });
+    for (const cap of capabilities) {
+      this.toolToServer.set(cap.name, name);
+    }
   }
 
-  private registerTool(serverName: string, capability: ToolCapability): void {
+  /**
+   * Register a tool manually (for testing or standalone use without a transport).
+   */
+  registerToolManually(serverName: string, capability: ToolCapability): void {
     this.toolToServer.set(capability.name, serverName);
 
     const server = this.servers.get(serverName);
@@ -109,7 +90,7 @@ export class ToolRegistry {
     } else {
       this.servers.set(serverName, {
         name: serverName,
-        process: null,
+        transport: null as unknown as StdioTransport,
         capabilities: [capability],
       });
     }
@@ -127,7 +108,7 @@ export class ToolRegistry {
   }
 
   /**
-   * Execute a tool call
+   * Execute a tool call by routing to the appropriate server transport.
    */
   async callTool(request: ToolCallRequest): Promise<ToolCallResult> {
     const serverName = this.toolToServer.get(request.name);
@@ -138,18 +119,54 @@ export class ToolRegistry {
       };
     }
 
-    // TODO: Actually route to the MCP server
-    // For now, return a placeholder
-    return {
-      content: `Tool ${request.name} called with ${JSON.stringify(request.arguments)}`,
-    };
+    const server = this.servers.get(serverName);
+    if (!server) {
+      return {
+        content: `Server not found: ${serverName}`,
+        isError: true,
+      };
+    }
+
+    // If no transport (manual registration / test mode), return placeholder
+    if (!server.transport) {
+      return {
+        content: `Tool ${request.name} called with ${JSON.stringify(request.arguments)}`,
+      };
+    }
+
+    try {
+      const response = (await server.transport.request('tools/call', {
+        name: request.name,
+        arguments: request.arguments,
+      })) as McpToolCallResponse;
+
+      // Extract text content from the MCP response
+      const textParts = (response.content ?? [])
+        .filter((block) => block.type === 'text' && block.text)
+        .map((block) => block.text);
+
+      return {
+        content: textParts.join('\n') || '(no content)',
+        isError: response.isError,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ToolServerError(serverName, `Tool call "${request.name}" failed: ${message}`);
+    }
   }
 
   /**
    * Shutdown all tool servers
    */
   async shutdown(): Promise<void> {
-    // TODO: Send shutdown signal to all servers
+    const stopPromises: Promise<void>[] = [];
+    for (const server of this.servers.values()) {
+      if (server.transport) {
+        stopPromises.push(server.transport.stop());
+      }
+    }
+    await Promise.allSettled(stopPromises);
+
     this.servers.clear();
     this.toolToServer.clear();
   }
