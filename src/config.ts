@@ -29,9 +29,7 @@ export const KNOWN_MODELS = [
  */
 export function warnIfUnknownModel(model: string): void {
   if (!(KNOWN_MODELS as readonly string[]).includes(model)) {
-    console.warn(
-      `Warning: Unknown model "${model}". Known models: ${KNOWN_MODELS.join(', ')}`,
-    );
+    console.warn(`Warning: Unknown model "${model}". Known models: ${KNOWN_MODELS.join(', ')}`);
   }
 }
 

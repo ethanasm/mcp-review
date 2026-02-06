@@ -60,7 +60,8 @@ export async function handleScanLintConfig(args: ScanLintConfigArgs): Promise<st
     const content = await tryReadFile(join(root, file));
     if (content !== null) {
       // Truncate very large config files
-      const truncated = content.length > 5000 ? `${content.substring(0, 5000)}\n... (truncated)` : content;
+      const truncated =
+        content.length > 5000 ? `${content.substring(0, 5000)}\n... (truncated)` : content;
       configs.push({ file, content: truncated });
     }
   }
@@ -93,13 +94,13 @@ async function collectFiles(
   dir: string,
   pattern: string | undefined,
   maxFiles: number,
-  depth: number = 0,
+  depth = 0,
 ): Promise<string[]> {
   if (depth > 10) return [];
 
   const results: string[] = [];
 
-  let entries;
+  let entries: import('node:fs').Dirent[];
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
@@ -164,7 +165,7 @@ export async function handleFindSimilarPatterns(args: FindSimilarPatternsArgs): 
       if (matches.length >= maxMatches) break;
 
       const line = lines[i];
-      if (line !== undefined && line.includes(args.pattern)) {
+      if (line?.includes(args.pattern)) {
         const relativePath = filePath.startsWith(root)
           ? filePath.substring(root.length + 1)
           : filePath;
@@ -186,7 +187,9 @@ export async function handleFindSimilarPatterns(args: FindSimilarPatternsArgs): 
  * Handle get_project_conventions tool call.
  * Read the .mcp-review.yml conventions field from the project root.
  */
-export async function handleGetProjectConventions(args: GetProjectConventionsArgs): Promise<string> {
+export async function handleGetProjectConventions(
+  args: GetProjectConventionsArgs,
+): Promise<string> {
   const root = args.project_root ?? process.cwd();
   const ymlPath = join(root, '.mcp-review.yml');
   const yamlPath = join(root, '.mcp-review.yaml');
@@ -212,8 +215,8 @@ export async function handleGetProjectConventions(args: GetProjectConventionsArg
   const config = parsed as Record<string, unknown>;
 
   // Return conventions section if present, otherwise the full config
-  if (config['conventions']) {
-    return JSON.stringify(config['conventions'], null, 2);
+  if (config.conventions) {
+    return JSON.stringify(config.conventions, null, 2);
   }
 
   return JSON.stringify(config, null, 2);

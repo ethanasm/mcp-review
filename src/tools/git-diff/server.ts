@@ -8,58 +8,70 @@ const server = new McpServer(
   { capabilities: { tools: {} } },
 );
 
-server.registerTool('get_diff', {
-  description: 'Get the full git diff for the review scope',
-  inputSchema: {
-    range: z.string().describe('Git revision range (e.g. "HEAD~1..HEAD" or "staged")'),
-    file_path: z.string().optional().describe('Optional: limit diff to specific file'),
-    context_lines: z.number().optional().describe('Context lines around changes'),
+server.registerTool(
+  'get_diff',
+  {
+    description: 'Get the full git diff for the review scope',
+    inputSchema: {
+      range: z.string().describe('Git revision range (e.g. "HEAD~1..HEAD" or "staged")'),
+      file_path: z.string().optional().describe('Optional: limit diff to specific file'),
+      context_lines: z.number().optional().describe('Context lines around changes'),
+    },
   },
-}, async (args) => {
-  try {
-    const text = await handleGetDiff(args);
-    return { content: [{ type: 'text', text }] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { content: [{ type: 'text', text: `Error getting diff: ${message}` }], isError: true };
-  }
-});
+  async (args) => {
+    try {
+      const text = await handleGetDiff(args);
+      return { content: [{ type: 'text', text }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { content: [{ type: 'text', text: `Error getting diff: ${message}` }], isError: true };
+    }
+  },
+);
 
-server.registerTool('get_diff_stats', {
-  description: 'Get file change summary (files changed, insertions, deletions)',
-  inputSchema: {
-    range: z.string().describe('Git revision range'),
+server.registerTool(
+  'get_diff_stats',
+  {
+    description: 'Get file change summary (files changed, insertions, deletions)',
+    inputSchema: {
+      range: z.string().describe('Git revision range'),
+    },
   },
-}, async (args) => {
-  try {
-    const text = await handleGetDiffStats(args);
-    return { content: [{ type: 'text', text }] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: 'text', text: `Error getting diff stats: ${message}` }],
-      isError: true,
-    };
-  }
-});
+  async (args) => {
+    try {
+      const text = await handleGetDiffStats(args);
+      return { content: [{ type: 'text', text }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error getting diff stats: ${message}` }],
+        isError: true,
+      };
+    }
+  },
+);
 
-server.registerTool('get_commit_messages', {
-  description: 'Get commit messages in the review range to understand developer intent',
-  inputSchema: {
-    range: z.string().describe('Git revision range'),
+server.registerTool(
+  'get_commit_messages',
+  {
+    description: 'Get commit messages in the review range to understand developer intent',
+    inputSchema: {
+      range: z.string().describe('Git revision range'),
+    },
   },
-}, async (args) => {
-  try {
-    const text = await handleGetCommitMessages(args);
-    return { content: [{ type: 'text', text }] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: 'text', text: `Error getting commit messages: ${message}` }],
-      isError: true,
-    };
-  }
-});
+  async (args) => {
+    try {
+      const text = await handleGetCommitMessages(args);
+      return { content: [{ type: 'text', text }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error getting commit messages: ${message}` }],
+        isError: true,
+      };
+    }
+  },
+);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();

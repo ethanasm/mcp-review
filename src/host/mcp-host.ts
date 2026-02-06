@@ -18,7 +18,10 @@ const DEFAULT_TOKEN_BUDGET = 100_000;
  * Resolve the command + args for spawning a TypeScript file.
  * Prefers local `tsx` (from node_modules/.bin) for speed, falls back to `npx tsx`.
  */
-function resolveRunner(projectRoot: string): { command: string; args: (serverPath: string) => string[] } {
+function resolveRunner(projectRoot: string): {
+  command: string;
+  args: (serverPath: string) => string[];
+} {
   const localTsx = resolve(projectRoot, 'node_modules', '.bin', 'tsx');
   // Using the local tsx binary directly avoids npx resolution overhead
   return { command: localTsx, args: (serverPath: string) => [serverPath] };
@@ -100,7 +103,8 @@ export class MCPHost {
       const result = results[i]!;
       if (result.status === 'rejected') {
         const serverName = TOOL_SERVERS[i]!.name;
-        const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        const message =
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
         console.error(`[mcp-host] Warning: Failed to start ${serverName}: ${message}`);
         // Continue without this server — graceful degradation
       }

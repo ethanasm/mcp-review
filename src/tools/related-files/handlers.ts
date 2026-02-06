@@ -40,29 +40,17 @@ interface TypeReference {
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs']);
 
-const SKIP_DIRS = new Set([
-  'node_modules',
-  'dist',
-  '.git',
-  'coverage',
-  '.next',
-  'build',
-  '.turbo',
-]);
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage', '.next', 'build', '.turbo']);
 
 /**
  * Recursively collect source files from a directory.
  */
-async function collectSourceFiles(
-  dir: string,
-  maxFiles: number,
-  depth: number = 0,
-): Promise<string[]> {
+async function collectSourceFiles(dir: string, maxFiles: number, depth = 0): Promise<string[]> {
   if (depth > 10) return [];
 
   const results: string[] = [];
 
-  let entries;
+  let entries: import('node:fs').Dirent[];
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
@@ -132,7 +120,8 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
   const maxMatches = 50;
 
   // Regex for import/require statements
-  const importRegex = /(?:import\s+.*?from\s+['"](.+?)['"]|import\s*\(\s*['"](.+?)['"]\s*\)|require\s*\(\s*['"](.+?)['"]\s*\))/g;
+  const importRegex =
+    /(?:import\s+.*?from\s+['"](.+?)['"]|import\s*\(\s*['"](.+?)['"]\s*\)|require\s*\(\s*['"](.+?)['"]\s*\))/g;
 
   for (const file of files) {
     if (matches.length >= maxMatches) break;
@@ -157,11 +146,14 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
 
       // Reset regex state
       importRegex.lastIndex = 0;
-      let match: RegExpExecArray | null;
+      let match: RegExpExecArray | null = importRegex.exec(line);
 
-      while ((match = importRegex.exec(line)) !== null) {
+      while (match !== null) {
         const importPath = match[1] ?? match[2] ?? match[3];
-        if (importPath === undefined) continue;
+        if (importPath === undefined) {
+          match = importRegex.exec(line);
+          continue;
+        }
 
         // Check if this import resolves to our target file
         if (importMatchesTarget(importPath, file, targets, root)) {
@@ -173,6 +165,7 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
           });
           break; // One match per line is enough
         }
+        match = importRegex.exec(line);
       }
     }
   }
@@ -182,9 +175,7 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
   }
 
   const header = `Found ${matches.length} file${matches.length > 1 ? 's' : ''} importing "${args.file_path}":\n`;
-  const body = matches
-    .map((m) => `  ${m.file}:${m.line}: ${m.statement}`)
-    .join('\n');
+  const body = matches.map((m) => `  ${m.file}:${m.line}: ${m.statement}`).join('\n');
   return header + body;
 }
 
@@ -266,7 +257,16 @@ export async function handleFindExports(args: FindExportsArgs): Promise<string> 
     // Named export list: export { a, b, c }
     const listMatch = trimmed.match(/^export\s+\{([^}]+)\}/);
     if (listMatch?.[1]) {
-      const names = listMatch[1].split(',').map((n) => n.trim().split(/\s+as\s+/).pop()?.trim()).filter(Boolean);
+      const names = listMatch[1]
+        .split(',')
+        .map((n) =>
+          n
+            .trim()
+            .split(/\s+as\s+/)
+            .pop()
+            ?.trim(),
+        )
+        .filter(Boolean);
       for (const name of names) {
         if (name) {
           exports.push({ name, kind: 'named', line: i + 1 });
@@ -280,9 +280,7 @@ export async function handleFindExports(args: FindExportsArgs): Promise<string> 
   }
 
   const header = `Found ${exports.length} export${exports.length > 1 ? 's' : ''} in "${args.file_path}":\n`;
-  const body = exports
-    .map((e) => `  L${e.line} [${e.kind}] ${e.name}`)
-    .join('\n');
+  const body = exports.map((e) => `  L${e.line} [${e.kind}] ${e.name}`).join('\n');
   return header + body;
 }
 
@@ -394,9 +392,7 @@ export async function handleFindTypeReferences(args: FindTypeReferencesArgs): Pr
   }
 
   const header = `Found ${references.length} reference${references.length > 1 ? 's' : ''} to "${args.type_name}":\n`;
-  const body = references
-    .map((r) => `  ${r.file}:${r.line}: ${r.text}`)
-    .join('\n');
+  const body = references.map((r) => `  ${r.file}:${r.line}: ${r.text}`).join('\n');
   return header + body;
 }
 

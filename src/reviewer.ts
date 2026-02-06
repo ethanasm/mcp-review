@@ -63,18 +63,17 @@ export function createReviewer(options: ReviewerOptions): Reviewer {
   return {
     async review(range: ResolvedRange): Promise<ReviewResult> {
       const endTotal = timer('review', 'total review');
-      const spinner = ora({ text: 'Starting tool servers...', isSilent: options.outputFormat === 'json' }).start();
+      const spinner = ora({
+        text: 'Starting tool servers...',
+        isSilent: options.outputFormat === 'json',
+      }).start();
 
       // Initialize MCP servers and fetch diff+stats in parallel
       const endParallelInit = timer('review', 'parallel init + diff fetch');
       const [, diff, stats] = await Promise.all([
         host.initialize(),
-        range.type === 'staged'
-          ? getStagedDiff()
-          : getDiff(range.from!, range.to!),
-        range.type === 'staged'
-          ? getStagedDiffStats()
-          : getDiffStats(range.from!, range.to!),
+        range.type === 'staged' ? getStagedDiff() : getDiff(range.from!, range.to!),
+        range.type === 'staged' ? getStagedDiffStats() : getDiffStats(range.from!, range.to!),
       ]);
       endParallelInit();
 
@@ -188,7 +187,9 @@ export function createReviewer(options: ReviewerOptions): Reviewer {
                     estimatedCost: 0,
                     cached: true,
                   });
-                } catch { /* don't crash watcher on history write failure */ }
+                } catch {
+                  /* don't crash watcher on history write failure */
+                }
               } else {
                 const reviewSpinner = ora('Analyzing changes...').start();
                 const result = await host.runReview(range, { diff, stats }, reviewSpinner);
@@ -205,7 +206,9 @@ export function createReviewer(options: ReviewerOptions): Reviewer {
                     estimatedCost: result.tokenUsage?.estimatedCost ?? 0,
                     cached: false,
                   });
-                } catch { /* don't crash watcher on history write failure */ }
+                } catch {
+                  /* don't crash watcher on history write failure */
+                }
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);

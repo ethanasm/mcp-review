@@ -9,9 +9,9 @@ import type { ResolvedRange } from '../git/resolver.js';
 import { debug, timer } from '../logger.js';
 import { getInitialPrompt, getSystemPrompt } from '../prompts/system.js';
 import {
+  type TemplateContext,
   getPerformanceReviewPrompt,
   getSecurityReviewPrompt,
-  type TemplateContext,
 } from '../prompts/templates.js';
 import type { ReviewResult } from '../reviewer.js';
 import { createUsageTracker } from '../usage.js';
@@ -112,8 +112,7 @@ export class ConversationManager {
       }
 
       if (sections.length > 0) {
-        return sections.join('\n\n---\n\n') +
-          `\n\nAnalyzing ${stats.filesChanged} files. Use the available tools to understand the context, then provide your structured review.`;
+        return `${sections.join('\n\n---\n\n')}\n\nAnalyzing ${stats.filesChanged} files. Use the available tools to understand the context, then provide your structured review.`;
       }
     }
 
@@ -125,7 +124,9 @@ export class ConversationManager {
    * This eliminates the most common first tool-call round (read_file on every changed file).
    * Skips binary files, ignored files, and files over 10KB.
    */
-  private async preloadFileContents(stats: DiffStats): Promise<{ path: string; content: string }[]> {
+  private async preloadFileContents(
+    stats: DiffStats,
+  ): Promise<{ path: string; content: string }[]> {
     const MAX_FILE_SIZE = 10_000; // chars
     const MAX_FILES = this.options.max_files;
 
@@ -137,7 +138,10 @@ export class ConversationManager {
       filesToLoad.map(async (filePath) => {
         const content = await readFile(filePath, 'utf-8');
         if (content.length > MAX_FILE_SIZE) {
-          return { path: filePath, content: content.substring(0, MAX_FILE_SIZE) + '\n... (truncated)' };
+          return {
+            path: filePath,
+            content: `${content.substring(0, MAX_FILE_SIZE)}\n... (truncated)`,
+          };
         }
         return { path: filePath, content };
       }),
@@ -211,7 +215,10 @@ export class ConversationManager {
     endFirstCall();
 
     tracker.addUsage(response.usage.input_tokens, response.usage.output_tokens);
-    debug('llm', `Turn ${turnNumber}: stop_reason=${response.stop_reason}, tokens=${response.usage.input_tokens}in/${response.usage.output_tokens}out`);
+    debug(
+      'llm',
+      `Turn ${turnNumber}: stop_reason=${response.stop_reason}, tokens=${response.usage.input_tokens}in/${response.usage.output_tokens}out`,
+    );
 
     // Handle tool calls in a loop (capped at MAX_TOOL_ROUNDS)
     let toolRounds = 0;
@@ -229,7 +236,10 @@ export class ConversationManager {
         spinner.text = describeToolCalls(toolUseBlocks);
       }
 
-      debug('tools', `Executing ${toolUseBlocks.length} tool call(s) in parallel: ${toolUseBlocks.map((b) => b.name).join(', ')}`);
+      debug(
+        'tools',
+        `Executing ${toolUseBlocks.length} tool call(s) in parallel: ${toolUseBlocks.map((b) => b.name).join(', ')}`,
+      );
       const endToolCalls = timer('tools', `${toolUseBlocks.length} parallel tool call(s)`);
 
       const toolResults = await Promise.all(
@@ -277,7 +287,10 @@ export class ConversationManager {
       endApiCall();
 
       tracker.addUsage(response.usage.input_tokens, response.usage.output_tokens);
-      debug('llm', `Turn ${turnNumber}: stop_reason=${response.stop_reason}, tokens=${response.usage.input_tokens}in/${response.usage.output_tokens}out`);
+      debug(
+        'llm',
+        `Turn ${turnNumber}: stop_reason=${response.stop_reason}, tokens=${response.usage.input_tokens}in/${response.usage.output_tokens}out`,
+      );
     }
 
     if (spinner) {

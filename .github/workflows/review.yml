@@ -20,8 +20,8 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Install mcp-review
-        run: bun install -g mcp-git-reviewer
+      - name: Install dependencies and build
+        run: bun install --frozen-lockfile && bun run build
 
       - name: Get PR commit range
         id: commits
@@ -32,7 +32,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          mcp-review "${{ steps.commits.outputs.range }}" \
+          node ./bin/mcp-review "${{ steps.commits.outputs.range }}" \
             --focus security,performance \
             --output json > review-output.json
 
