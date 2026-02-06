@@ -13,80 +13,105 @@ const server = new McpServer(
   { capabilities: { tools: {} } },
 );
 
-server.registerTool('find_importers', {
-  description: 'Find files that import or require the given file',
-  inputSchema: {
-    file_path: z.string().describe('Relative path to the file from project root'),
-    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
+server.registerTool(
+  'find_importers',
+  {
+    description: 'Find files that import or require the given file',
+    inputSchema: {
+      file_path: z.string().describe('Relative path to the file from project root'),
+      project_root: z
+        .string()
+        .optional()
+        .describe('Absolute path to the project root directory (defaults to cwd)'),
+    },
   },
-}, async (args) => {
-  try {
-    const text = await handleFindImporters(args);
-    return { content: [{ type: 'text', text }] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: 'text', text: `Error finding importers: ${message}` }],
-      isError: true,
-    };
-  }
-});
+  async (args) => {
+    try {
+      const text = await handleFindImporters(args);
+      return { content: [{ type: 'text', text }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error finding importers: ${message}` }],
+        isError: true,
+      };
+    }
+  },
+);
 
-server.registerTool('find_exports', {
-  description: 'Parse a file for export statements (named, default, re-exports)',
-  inputSchema: {
-    file_path: z.string().describe('Absolute path to the file'),
+server.registerTool(
+  'find_exports',
+  {
+    description: 'Parse a file for export statements (named, default, re-exports)',
+    inputSchema: {
+      file_path: z.string().describe('Absolute path to the file'),
+    },
   },
-}, async (args) => {
-  try {
-    const text = await handleFindExports(args);
-    return { content: [{ type: 'text', text }] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: 'text', text: `Error finding exports: ${message}` }],
-      isError: true,
-    };
-  }
-});
+  async (args) => {
+    try {
+      const text = await handleFindExports(args);
+      return { content: [{ type: 'text', text }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error finding exports: ${message}` }],
+        isError: true,
+      };
+    }
+  },
+);
 
-server.registerTool('find_test_files', {
-  description: 'Find test files corresponding to a source file using common naming conventions',
-  inputSchema: {
-    file_path: z.string().describe('Relative path to the source file from project root'),
-    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
+server.registerTool(
+  'find_test_files',
+  {
+    description: 'Find test files corresponding to a source file using common naming conventions',
+    inputSchema: {
+      file_path: z.string().describe('Relative path to the source file from project root'),
+      project_root: z
+        .string()
+        .optional()
+        .describe('Absolute path to the project root directory (defaults to cwd)'),
+    },
   },
-}, async (args) => {
-  try {
-    const text = await handleFindTestFiles(args);
-    return { content: [{ type: 'text', text }] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: 'text', text: `Error finding test files: ${message}` }],
-      isError: true,
-    };
-  }
-});
+  async (args) => {
+    try {
+      const text = await handleFindTestFiles(args);
+      return { content: [{ type: 'text', text }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error finding test files: ${message}` }],
+        isError: true,
+      };
+    }
+  },
+);
 
-server.registerTool('find_type_references', {
-  description: 'Search for type or interface name usage across the codebase',
-  inputSchema: {
-    type_name: z.string().describe('The type or interface name to search for'),
-    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
+server.registerTool(
+  'find_type_references',
+  {
+    description: 'Search for type or interface name usage across the codebase',
+    inputSchema: {
+      type_name: z.string().describe('The type or interface name to search for'),
+      project_root: z
+        .string()
+        .optional()
+        .describe('Absolute path to the project root directory (defaults to cwd)'),
+    },
   },
-}, async (args) => {
-  try {
-    const text = await handleFindTypeReferences(args);
-    return { content: [{ type: 'text', text }] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: 'text', text: `Error finding type references: ${message}` }],
-      isError: true,
-    };
-  }
-});
+  async (args) => {
+    try {
+      const text = await handleFindTypeReferences(args);
+      return { content: [{ type: 'text', text }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: 'text', text: `Error finding type references: ${message}` }],
+        isError: true,
+      };
+    }
+  },
+);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();

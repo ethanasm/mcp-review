@@ -78,11 +78,7 @@ export async function clearCache(projectRoot: string): Promise<void> {
 
   try {
     const files = await readdir(cacheDir);
-    await Promise.all(
-      files
-        .filter((f) => f.endsWith('.json'))
-        .map((f) => rm(join(cacheDir, f))),
-    );
+    await Promise.all(files.filter((f) => f.endsWith('.json')).map((f) => rm(join(cacheDir, f))));
   } catch {
     // Cache directory doesn't exist — nothing to clear
   }

@@ -57,7 +57,11 @@ interface TreeEntry {
 /**
  * Recursively build a directory tree, respecting max depth.
  */
-async function buildTree(dirPath: string, currentDepth: number, maxDepth: number): Promise<TreeEntry[]> {
+async function buildTree(
+  dirPath: string,
+  currentDepth: number,
+  maxDepth: number,
+): Promise<TreeEntry[]> {
   if (currentDepth >= maxDepth) {
     return [];
   }
@@ -91,7 +95,7 @@ async function buildTree(dirPath: string, currentDepth: number, maxDepth: number
 /**
  * Format tree entries into a readable string with indentation.
  */
-function formatTree(entries: TreeEntry[], indent: string = ''): string {
+function formatTree(entries: TreeEntry[], indent = ''): string {
   const lines: string[] = [];
 
   for (const entry of entries) {
@@ -202,7 +206,8 @@ async function findImportersSimple(
 
   const sourceFiles = await collectSourceFilesForImporters(projectRoot, 300);
   const matches: { file: string; line: number; statement: string }[] = [];
-  const importRegex = /(?:import\s+.*?from\s+['"](.+?)['"]|import\s*\(\s*['"](.+?)['"]\s*\)|require\s*\(\s*['"](.+?)['"]\s*\))/g;
+  const importRegex =
+    /(?:import\s+.*?from\s+['"](.+?)['"]|import\s*\(\s*['"](.+?)['"]\s*\)|require\s*\(\s*['"](.+?)['"]\s*\))/g;
 
   for (const sf of sourceFiles) {
     if (matches.length >= 30) break;
@@ -222,17 +227,26 @@ async function findImportersSimple(
       if (ln === undefined) continue;
 
       importRegex.lastIndex = 0;
-      let m: RegExpExecArray | null;
-      while ((m = importRegex.exec(ln)) !== null) {
+      let m: RegExpExecArray | null = importRegex.exec(ln);
+      while (m !== null) {
         const importPath = m[1] ?? m[2] ?? m[3];
-        if (!importPath) continue;
+        if (!importPath) {
+          m = importRegex.exec(ln);
+          continue;
+        }
 
         if (importPath.startsWith('.')) {
           const sourceDir = dirname(sf);
           const resolved = relative(projectRoot, resolve(sourceDir, importPath));
           const resExt = extname(resolved);
           const resolvedNoExt = resExt ? resolved.slice(0, -resExt.length) : resolved;
-          if (targets.some((t) => { const tExt = extname(t); const tNoExt = tExt ? t.slice(0, -tExt.length) : t; return resolvedNoExt === tNoExt || resolved === t; })) {
+          if (
+            targets.some((t) => {
+              const tExt = extname(t);
+              const tNoExt = tExt ? t.slice(0, -tExt.length) : t;
+              return resolvedNoExt === tNoExt || resolved === t;
+            })
+          ) {
             matches.push({ file: relative(projectRoot, sf), line: i + 1, statement: ln.trim() });
             break;
           }
@@ -240,6 +254,7 @@ async function findImportersSimple(
           matches.push({ file: relative(projectRoot, sf), line: i + 1, statement: ln.trim() });
           break;
         }
+        m = importRegex.exec(ln);
       }
     }
   }
@@ -250,12 +265,12 @@ async function findImportersSimple(
 async function collectSourceFilesForImporters(
   dir: string,
   maxFiles: number,
-  depth: number = 0,
+  depth = 0,
 ): Promise<string[]> {
   if (depth > 10) return [];
   const results: string[] = [];
 
-  let entries;
+  let entries: import('node:fs').Dirent[];
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
@@ -266,7 +281,11 @@ async function collectSourceFilesForImporters(
     if (results.length >= maxFiles) break;
     if (entry.isDirectory()) {
       if (IMPORTER_SKIP_DIRS.has(entry.name)) continue;
-      const sub = await collectSourceFilesForImporters(join(dir, entry.name), maxFiles - results.length, depth + 1);
+      const sub = await collectSourceFilesForImporters(
+        join(dir, entry.name),
+        maxFiles - results.length,
+        depth + 1,
+      );
       results.push(...sub);
     } else if (entry.isFile() && IMPORTER_SOURCE_EXTS.has(extname(entry.name))) {
       results.push(join(dir, entry.name));

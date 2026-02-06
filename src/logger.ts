@@ -45,7 +45,11 @@ export function timer(label: string, operation: string): () => number {
 /**
  * Time an async operation and log the elapsed time.
  */
-export async function timeAsync<T>(label: string, operation: string, fn: () => Promise<T>): Promise<T> {
+export async function timeAsync<T>(
+  label: string,
+  operation: string,
+  fn: () => Promise<T>,
+): Promise<T> {
   const end = timer(label, operation);
   try {
     const result = await fn();
