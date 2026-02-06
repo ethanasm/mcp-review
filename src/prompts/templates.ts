@@ -72,14 +72,7 @@ export function getSecurityReviewPrompt(context: TemplateContext): string {
 ${context.diff}
 \`\`\`
 
-Focus specifically on security concerns:
-- Input validation and sanitization
-- Authentication and authorization logic
-- Data exposure risks
-- Injection vulnerabilities (SQL, XSS, command injection)
-- Cryptographic issues
-- Sensitive data handling
-- Access control
+${SECURITY_FOCUS_INSTRUCTIONS}
 
 Use the available tools to understand the security context of the code, then provide your structured review with emphasis on security findings.`;
 }
@@ -96,14 +89,34 @@ export function getPerformanceReviewPrompt(context: TemplateContext): string {
 ${context.diff}
 \`\`\`
 
-Focus specifically on performance concerns:
+${PERFORMANCE_FOCUS_INSTRUCTIONS}
+
+Use the available tools to understand the performance context, then provide your structured review with emphasis on performance findings.`;
+}
+
+const SECURITY_FOCUS_INSTRUCTIONS = `Focus specifically on security concerns:
+- Input validation and sanitization
+- Authentication and authorization logic
+- Data exposure risks
+- Injection vulnerabilities (SQL, XSS, command injection)
+- Cryptographic issues
+- Sensitive data handling
+- Access control`;
+
+const PERFORMANCE_FOCUS_INSTRUCTIONS = `Focus specifically on performance concerns:
 - N+1 queries or inefficient data fetching
 - Unnecessary computations or re-renders
 - Memory leaks or excessive memory usage
 - Missing caching opportunities
 - Algorithmic complexity issues
 - Bundle size impacts
-- Database query efficiency
+- Database query efficiency`;
 
-Use the available tools to understand the performance context, then provide your structured review with emphasis on performance findings.`;
+/**
+ * Get focus-area instructions without the diff (for combined prompts).
+ */
+export function getFocusInstructions(area: string): string | null {
+  if (area === 'security') return SECURITY_FOCUS_INSTRUCTIONS;
+  if (area === 'performance') return PERFORMANCE_FOCUS_INSTRUCTIONS;
+  return null;
 }
