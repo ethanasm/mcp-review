@@ -1,0 +1,89 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install mcp-review
+        run: bun install -g mcp-git-reviewer
+
+      - name: Get PR commit range
+        id: commits
+        run: |
+          echo "range=${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Run AI code review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          mcp-review "${{ steps.commits.outputs.range }}" \
+            --focus security,performance \
+            --output json > review-output.json
+
+      - name: Post review comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const review = JSON.parse(fs.readFileSync('review-output.json', 'utf8'));
+              const critical = review.critical || [];
+              const suggestions = review.suggestions || [];
+              const positive = review.positive || [];
+
+              let body = '## AI Code Review\n\n';
+
+              if (critical.length > 0) {
+                body += '### Critical Issues\n';
+                for (const f of critical) {
+                  const loc = f.line ? `${f.file}:${f.line}` : f.file;
+                  body += `- **${loc}**: ${f.message}\n`;
+                }
+                body += '\n';
+              }
+
+              if (suggestions.length > 0) {
+                body += '### Suggestions\n';
+                for (const f of suggestions) {
+                  const loc = f.line ? `${f.file}:${f.line}` : f.file;
+                  body += `- ${loc}: ${f.message}\n`;
+                }
+                body += '\n';
+              }
+
+              if (positive.length > 0) {
+                body += '### Looks Good\n';
+                for (const f of positive) {
+                  body += `- ${f.message}\n`;
+                }
+                body += '\n';
+              }
+
+              body += `\n*Confidence: ${review.confidence} | ${review.stats.filesChanged} files, +${review.stats.insertions}/-${review.stats.deletions}*`;
+
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body
+              });
+            } catch (e) {
+              console.log('Failed to post review comment:', e.message);
+            }
