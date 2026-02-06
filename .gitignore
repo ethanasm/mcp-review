@@ -35,3 +35,6 @@ pnpm-lock.yaml
 # Cache
 .cache/
 .mcp-review-cache/
+
+# Usage history
+.mcp-review-history.json

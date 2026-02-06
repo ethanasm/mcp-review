@@ -4,6 +4,7 @@ import { cacheReview, getCachedReview } from './cache.js';
 import type { Config } from './config.js';
 import { getDiff, getDiffStats, getStagedDiff, getStagedDiffStats } from './git/commands.js';
 import type { ResolvedRange } from './git/resolver.js';
+import { appendUsageHistory } from './history.js';
 import { MCPHost } from './host/mcp-host.js';
 import { debug, setVerbose, timer } from './logger.js';
 import { renderReview } from './output.js';
@@ -83,6 +84,15 @@ export function createReviewer(options: ReviewerOptions): Reviewer {
         if (cached) {
           spinner.succeed('Review loaded from cache');
           renderReview(cached, options, { fromCache: true });
+          await appendUsageHistory({
+            timestamp: Date.now(),
+            range: range.display,
+            model: options.model,
+            inputTokens: 0,
+            outputTokens: 0,
+            estimatedCost: 0,
+            cached: true,
+          });
           endTotal();
           return cached;
         }
@@ -93,6 +103,16 @@ export function createReviewer(options: ReviewerOptions): Reviewer {
 
         // Store result in cache after a successful review
         await cacheReview(diff, options, options.model, result);
+
+        await appendUsageHistory({
+          timestamp: Date.now(),
+          range: range.display,
+          model: options.model,
+          inputTokens: result.tokenUsage?.inputTokens ?? 0,
+          outputTokens: result.tokenUsage?.outputTokens ?? 0,
+          estimatedCost: result.tokenUsage?.estimatedCost ?? 0,
+          cached: false,
+        });
 
         spinner.succeed('Review complete');
         renderReview(result, options);
@@ -158,12 +178,34 @@ export function createReviewer(options: ReviewerOptions): Reviewer {
               const cached = await getCachedReview(diff, options, options.model);
               if (cached) {
                 renderReview(cached, options, { fromCache: true });
+                try {
+                  await appendUsageHistory({
+                    timestamp: Date.now(),
+                    range: range.display,
+                    model: options.model,
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    estimatedCost: 0,
+                    cached: true,
+                  });
+                } catch { /* don't crash watcher on history write failure */ }
               } else {
                 const reviewSpinner = ora('Analyzing changes...').start();
                 const result = await host.runReview(range, { diff, stats }, reviewSpinner);
                 await cacheReview(diff, options, options.model, result);
                 reviewSpinner.succeed('Review complete');
                 renderReview(result, options);
+                try {
+                  await appendUsageHistory({
+                    timestamp: Date.now(),
+                    range: range.display,
+                    model: options.model,
+                    inputTokens: result.tokenUsage?.inputTokens ?? 0,
+                    outputTokens: result.tokenUsage?.outputTokens ?? 0,
+                    estimatedCost: result.tokenUsage?.estimatedCost ?? 0,
+                    cached: false,
+                  });
+                } catch { /* don't crash watcher on history write failure */ }
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
