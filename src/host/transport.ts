@@ -32,6 +32,7 @@ export class StdioTransport extends EventEmitter {
   constructor(
     private command: string,
     private args: string[] = [],
+    private options: { cwd?: string } = {},
   ) {
     super();
   }
@@ -43,6 +44,7 @@ export class StdioTransport extends EventEmitter {
     return new Promise((resolve, reject) => {
       this.process = spawn(this.command, this.args, {
         stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: this.options.cwd,
       });
 
       this.process.stdout?.on('data', (data: Buffer) => {
