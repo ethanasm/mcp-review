@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Mock the logger
+vi.mock('../../src/logger.js', () => ({
+  debug: vi.fn(),
+  timer: vi.fn(() => () => 0),
+  setVerbose: vi.fn(),
+}));
+
 // Mock the StdioTransport
 const mockTransport = {
   start: vi.fn().mockResolvedValue(undefined),
@@ -99,24 +106,27 @@ describe('MCPHost', () => {
       spy.mockRestore();
     });
 
-    it('logs server names in verbose mode', async () => {
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('logs server names via debug logger', async () => {
+      const { debug: mockDebug } = await import('../../src/logger.js');
 
-      const host = new MCPHost({ ...defaultOptions, verbose: true });
+      const host = new MCPHost(defaultOptions);
       await host.initialize();
 
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Started server:'));
-
-      spy.mockRestore();
+      expect(mockDebug).toHaveBeenCalledWith('mcp-host', expect.stringContaining('Started server:'));
     });
   });
 
   describe('runReview', () => {
+    const prefetched = {
+      diff: 'mock diff',
+      stats: { filesChanged: 1, insertions: 5, deletions: 2, files: ['test.ts'] },
+    };
+
     it('throws if not initialized', async () => {
       const host = new MCPHost(defaultOptions);
 
       await expect(
-        host.runReview({ type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' }),
+        host.runReview({ type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' }, prefetched),
       ).rejects.toThrow('not initialized');
     });
 
@@ -124,12 +134,10 @@ describe('MCPHost', () => {
       const host = new MCPHost(defaultOptions);
       await host.initialize();
 
-      const result = await host.runReview({
-        type: 'range',
-        from: 'HEAD~1',
-        to: 'HEAD',
-        display: 'test',
-      });
+      const result = await host.runReview(
+        { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
+        prefetched,
+      );
 
       expect(result).toBeDefined();
       expect(result.confidence).toBe('high');
@@ -174,7 +182,7 @@ describe('MCPHost', () => {
 
       // Should throw because it's no longer initialized
       await expect(
-        host.runReview({ type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' }),
+        host.runReview({ type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' }, { diff: '', stats: { filesChanged: 0, insertions: 0, deletions: 0, files: [] } }),
       ).rejects.toThrow('not initialized');
     });
 

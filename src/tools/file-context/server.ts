@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { handleListDirectory, handleReadFile, handleReadLines } from './handlers.js';
+import { handleGetFileContext, handleListDirectory, handleReadFile, handleReadLines } from './handlers.js';
 
 const server = new McpServer(
   { name: 'file-context', version: '0.1.0' },
@@ -60,6 +60,26 @@ server.registerTool('list_directory', {
     const message = error instanceof Error ? error.message : String(error);
     return {
       content: [{ type: 'text', text: `Error listing directory: ${message}` }],
+      isError: true,
+    };
+  }
+});
+
+server.registerTool('get_file_context', {
+  description: 'Read a file with line numbers, extract its exports, and optionally find importers — all in one call',
+  inputSchema: {
+    path: z.string().describe('Path to the file'),
+    project_root: z.string().optional().describe('Absolute path to the project root (needed for importer search)'),
+    include_importers: z.boolean().optional().describe('Whether to search for files that import this file (default: false)'),
+  },
+}, async (args) => {
+  try {
+    const text = await handleGetFileContext(args);
+    return { content: [{ type: 'text', text }] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      content: [{ type: 'text', text: `Error getting file context: ${message}` }],
       isError: true,
     };
   }

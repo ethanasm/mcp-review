@@ -3,7 +3,7 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 
 export interface FindImportersArgs {
   file_path: string;
-  project_root: string;
+  project_root?: string;
 }
 
 export interface FindExportsArgs {
@@ -12,12 +12,12 @@ export interface FindExportsArgs {
 
 export interface FindTestFilesArgs {
   file_path: string;
-  project_root: string;
+  project_root?: string;
 }
 
 export interface FindTypeReferencesArgs {
   type_name: string;
-  project_root: string;
+  project_root?: string;
 }
 
 interface ImportMatch {
@@ -124,8 +124,9 @@ function buildImportTargets(filePath: string, projectRoot: string): string[] {
  * Find files that import or require the given file.
  */
 export async function handleFindImporters(args: FindImportersArgs): Promise<string> {
-  const files = await collectSourceFiles(args.project_root, 500);
-  const targets = buildImportTargets(args.file_path, args.project_root);
+  const root = args.project_root ?? process.cwd();
+  const files = await collectSourceFiles(root, 500);
+  const targets = buildImportTargets(args.file_path, root);
 
   const matches: ImportMatch[] = [];
   const maxMatches = 50;
@@ -137,7 +138,7 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
     if (matches.length >= maxMatches) break;
 
     // Skip searching the target file itself
-    const absTarget = resolve(args.project_root, args.file_path);
+    const absTarget = resolve(root, args.file_path);
     if (resolve(file) === absTarget) continue;
 
     let content: string;
@@ -163,8 +164,8 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
         if (importPath === undefined) continue;
 
         // Check if this import resolves to our target file
-        if (importMatchesTarget(importPath, file, targets, args.project_root)) {
-          const relFile = relative(args.project_root, file);
+        if (importMatchesTarget(importPath, file, targets, root)) {
+          const relFile = relative(root, file);
           matches.push({
             file: relFile,
             line: i + 1,
@@ -290,8 +291,9 @@ export async function handleFindExports(args: FindExportsArgs): Promise<string> 
  * Search for test files corresponding to a source file using common conventions.
  */
 export async function handleFindTestFiles(args: FindTestFilesArgs): Promise<string> {
-  const absPath = resolve(args.project_root, args.file_path);
-  const relPath = relative(args.project_root, absPath);
+  const root = args.project_root ?? process.cwd();
+  const absPath = resolve(root, args.file_path);
+  const relPath = relative(root, absPath);
   const ext = extname(relPath);
   const base = basename(relPath, ext);
   const dir = dirname(relPath);
@@ -326,7 +328,7 @@ export async function handleFindTestFiles(args: FindTestFilesArgs): Promise<stri
   const found: string[] = [];
 
   for (const candidate of candidates) {
-    const absCandidate = join(args.project_root, candidate);
+    const absCandidate = join(root, candidate);
     try {
       await readFile(absCandidate, 'utf-8');
       found.push(candidate);
@@ -349,7 +351,8 @@ export async function handleFindTestFiles(args: FindTestFilesArgs): Promise<stri
  * Search for type/interface name usage across the codebase.
  */
 export async function handleFindTypeReferences(args: FindTypeReferencesArgs): Promise<string> {
-  const files = await collectSourceFiles(args.project_root, 500);
+  const root = args.project_root ?? process.cwd();
+  const files = await collectSourceFiles(root, 500);
 
   const references: TypeReference[] = [];
   const maxRefs = 50;
@@ -376,7 +379,7 @@ export async function handleFindTypeReferences(args: FindTypeReferencesArgs): Pr
       if (line === undefined) continue;
 
       if (typeRegex.test(line)) {
-        const relFile = relative(args.project_root, file);
+        const relFile = relative(root, file);
         references.push({
           file: relFile,
           line: i + 1,

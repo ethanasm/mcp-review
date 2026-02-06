@@ -15,7 +15,7 @@ const server = new McpServer(
 server.registerTool('scan_lint_config', {
   description: 'Find and read linting/formatting configuration files in the project',
   inputSchema: {
-    project_root: z.string().describe('Absolute path to the project root directory'),
+    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
   },
 }, async (args) => {
   try {
@@ -34,7 +34,7 @@ server.registerTool('find_similar_patterns', {
   description: 'Search the codebase for a pattern string and return matching file excerpts',
   inputSchema: {
     pattern: z.string().describe('The pattern string to search for'),
-    project_root: z.string().describe('Absolute path to the project root directory'),
+    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
     file_glob: z
       .string()
       .optional()
@@ -56,7 +56,7 @@ server.registerTool('find_similar_patterns', {
 server.registerTool('get_project_conventions', {
   description: 'Read project conventions from .mcp-review.yml configuration',
   inputSchema: {
-    project_root: z.string().describe('Absolute path to the project root directory'),
+    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
   },
 }, async (args) => {
   try {

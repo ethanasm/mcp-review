@@ -54,9 +54,29 @@ export interface ServerConfig {
  * - Live mode: spawns real tool server processes and routes via StdioTransport
  * - Standalone mode: tools registered manually with registerToolManually() for testing
  */
+/**
+ * Tools whose results are safe to cache within a single review session.
+ * Only tools that return deterministic, read-only data should be listed.
+ */
+const CACHEABLE_TOOLS = new Set([
+  'read_file',
+  'read_lines',
+  'get_file_context',
+  'find_importers',
+  'find_exports',
+  'find_test_files',
+  'find_type_references',
+  'scan_lint_config',
+  'get_project_conventions',
+  'get_diff',
+  'get_diff_stats',
+  'get_commit_messages',
+]);
+
 export class ToolRegistry {
   private servers: Map<string, ToolServer> = new Map();
   private toolToServer: Map<string, string> = new Map();
+  private cache: Map<string, ToolCallResult> = new Map();
 
   /**
    * Register a tool server with an active transport.
@@ -108,9 +128,27 @@ export class ToolRegistry {
   }
 
   /**
+   * Build a cache key from a tool call request.
+   */
+  private cacheKey(request: ToolCallRequest): string {
+    return `${request.name}:${JSON.stringify(request.arguments)}`;
+  }
+
+  /**
    * Execute a tool call by routing to the appropriate server transport.
+   * Results from cacheable tools are stored in an in-memory cache for
+   * the duration of the review session to avoid redundant calls.
    */
   async callTool(request: ToolCallRequest): Promise<ToolCallResult> {
+    // Check cache first
+    if (CACHEABLE_TOOLS.has(request.name)) {
+      const key = this.cacheKey(request);
+      const cached = this.cache.get(key);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const serverName = this.toolToServer.get(request.name);
     if (!serverName) {
       return {
@@ -145,10 +183,17 @@ export class ToolRegistry {
         .filter((block) => block.type === 'text' && block.text)
         .map((block) => block.text);
 
-      return {
+      const result: ToolCallResult = {
         content: textParts.join('\n') || '(no content)',
         isError: response.isError,
       };
+
+      // Cache successful results from cacheable tools
+      if (CACHEABLE_TOOLS.has(request.name) && !result.isError) {
+        this.cache.set(this.cacheKey(request), result);
+      }
+
+      return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ToolServerError(serverName, `Tool call "${request.name}" failed: ${message}`);
@@ -169,5 +214,6 @@ export class ToolRegistry {
 
     this.servers.clear();
     this.toolToServer.clear();
+    this.cache.clear();
   }
 }

@@ -17,7 +17,7 @@ server.registerTool('find_importers', {
   description: 'Find files that import or require the given file',
   inputSchema: {
     file_path: z.string().describe('Relative path to the file from project root'),
-    project_root: z.string().describe('Absolute path to the project root directory'),
+    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
   },
 }, async (args) => {
   try {
@@ -54,7 +54,7 @@ server.registerTool('find_test_files', {
   description: 'Find test files corresponding to a source file using common naming conventions',
   inputSchema: {
     file_path: z.string().describe('Relative path to the source file from project root'),
-    project_root: z.string().describe('Absolute path to the project root directory'),
+    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
   },
 }, async (args) => {
   try {
@@ -73,7 +73,7 @@ server.registerTool('find_type_references', {
   description: 'Search for type or interface name usage across the codebase',
   inputSchema: {
     type_name: z.string().describe('The type or interface name to search for'),
-    project_root: z.string().describe('Absolute path to the project root directory'),
+    project_root: z.string().optional().describe('Absolute path to the project root directory (defaults to cwd)'),
   },
 }, async (args) => {
   try {

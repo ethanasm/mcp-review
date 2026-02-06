@@ -63,8 +63,8 @@ export class StdioTransport extends EventEmitter {
         this.emit('close', code);
       });
 
-      // Wait a moment for process to start
-      setTimeout(resolve, 100);
+      // Resolve once the process has spawned (no arbitrary delay)
+      this.process.once('spawn', () => resolve());
     });
   }
 

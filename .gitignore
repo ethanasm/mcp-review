@@ -7,6 +7,7 @@ dist/
 # Environment
 .env
 .env.local
+.mcp-review.yml
 
 # IDE
 .vscode/
@@ -25,8 +26,12 @@ coverage/
 *.log
 npm-debug.log*
 
-# Lockfile (binary)
+# Lockfiles — project uses bun.lock (text-based)
 bun.lockb
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # Cache
 .cache/
+.mcp-review-cache/

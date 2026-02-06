@@ -3,17 +3,17 @@ import { join } from 'node:path';
 import YAML from 'yaml';
 
 export interface ScanLintConfigArgs {
-  project_root: string;
+  project_root?: string;
 }
 
 export interface FindSimilarPatternsArgs {
   pattern: string;
-  project_root: string;
+  project_root?: string;
   file_glob?: string;
 }
 
 export interface GetProjectConventionsArgs {
-  project_root: string;
+  project_root?: string;
 }
 
 /**
@@ -32,7 +32,7 @@ async function tryReadFile(filePath: string): Promise<string | null> {
  * Find and read linting/formatting config files in the project root.
  */
 export async function handleScanLintConfig(args: ScanLintConfigArgs): Promise<string> {
-  const root = args.project_root;
+  const root = args.project_root ?? process.cwd();
   const configs: { file: string; content: string }[] = [];
 
   // Config files to look for, in order of priority
@@ -142,8 +142,9 @@ async function collectFiles(
  * Search for a pattern string across source files, returning matching excerpts.
  */
 export async function handleFindSimilarPatterns(args: FindSimilarPatternsArgs): Promise<string> {
+  const root = args.project_root ?? process.cwd();
   const fileGlob = args.file_glob ?? '*.ts';
-  const files = await collectFiles(args.project_root, fileGlob, 200);
+  const files = await collectFiles(root, fileGlob, 200);
 
   const matches: { file: string; lineNum: number; line: string }[] = [];
   const maxMatches = 30;
@@ -164,8 +165,8 @@ export async function handleFindSimilarPatterns(args: FindSimilarPatternsArgs): 
 
       const line = lines[i];
       if (line !== undefined && line.includes(args.pattern)) {
-        const relativePath = filePath.startsWith(args.project_root)
-          ? filePath.substring(args.project_root.length + 1)
+        const relativePath = filePath.startsWith(root)
+          ? filePath.substring(root.length + 1)
           : filePath;
         matches.push({ file: relativePath, lineNum: i + 1, line: line.trim() });
       }
@@ -186,8 +187,9 @@ export async function handleFindSimilarPatterns(args: FindSimilarPatternsArgs): 
  * Read the .mcp-review.yml conventions field from the project root.
  */
 export async function handleGetProjectConventions(args: GetProjectConventionsArgs): Promise<string> {
-  const ymlPath = join(args.project_root, '.mcp-review.yml');
-  const yamlPath = join(args.project_root, '.mcp-review.yaml');
+  const root = args.project_root ?? process.cwd();
+  const ymlPath = join(root, '.mcp-review.yml');
+  const yamlPath = join(root, '.mcp-review.yaml');
 
   const content = (await tryReadFile(ymlPath)) ?? (await tryReadFile(yamlPath));
 
