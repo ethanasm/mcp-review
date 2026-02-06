@@ -20,7 +20,7 @@
     "check": "biome ci src tests",
     "typecheck": "tsc --noEmit",
     "verify": "bash scripts/verify.sh",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",
