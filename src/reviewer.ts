@@ -25,6 +25,7 @@ export interface ReviewResult {
     deletions: number;
   };
   tokenUsage?: { inputTokens: number; outputTokens: number; estimatedCost: number };
+  truncated?: { omittedFiles: number };
 }
 
 export interface ReviewFinding {
