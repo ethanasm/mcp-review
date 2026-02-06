@@ -102,4 +102,51 @@ describe('renderReview', () => {
     const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
     expect(allOutput).toContain('high');
   });
+
+  it('displays cache hit message when fromCache is true', () => {
+    const logSpy = vi.spyOn(console, 'log');
+    renderReview(baseResult, baseOptions, { fromCache: true });
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(allOutput).toContain('Cached review (no API call)');
+    expect(allOutput).toContain('Usage');
+  });
+
+  it('displays token usage when verbose and tokenUsage present', () => {
+    const logSpy = vi.spyOn(console, 'log');
+    renderReview(
+      {
+        ...baseResult,
+        tokenUsage: { inputTokens: 1234, outputTokens: 567, estimatedCost: 0.01 },
+      },
+      { ...baseOptions, verbose: true },
+    );
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(allOutput).toContain('Usage');
+    expect(allOutput).toContain('1,234');
+    expect(allOutput).toContain('567');
+  });
+
+  it('does not display usage when verbose is false', () => {
+    const logSpy = vi.spyOn(console, 'log');
+    renderReview(
+      {
+        ...baseResult,
+        tokenUsage: { inputTokens: 1234, outputTokens: 567, estimatedCost: 0.01 },
+      },
+      { ...baseOptions, verbose: false },
+    );
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(allOutput).not.toContain('Usage');
+  });
+
+  it('does not display usage when tokenUsage is undefined', () => {
+    const logSpy = vi.spyOn(console, 'log');
+    renderReview(baseResult, { ...baseOptions, verbose: true });
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(allOutput).not.toContain('Usage');
+  });
 });

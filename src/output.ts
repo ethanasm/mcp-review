@@ -1,8 +1,17 @@
 import boxen from 'boxen';
 import chalk from 'chalk';
 import type { ReviewFinding, ReviewResult, ReviewerOptions } from './reviewer.js';
+import { createUsageTracker } from './usage.js';
 
-export function renderReview(result: ReviewResult, options: ReviewerOptions): void {
+export interface RenderOptions {
+  fromCache?: boolean;
+}
+
+export function renderReview(
+  result: ReviewResult,
+  options: ReviewerOptions,
+  renderOpts: RenderOptions = {},
+): void {
   if (options.outputFormat === 'json') {
     console.log(JSON.stringify(result, null, 2));
     return;
@@ -58,6 +67,19 @@ export function renderReview(result: ReviewResult, options: ReviewerOptions): vo
     .join(' · ');
   console.log(`  ${summary}`);
   console.log(`  Estimated review confidence: ${chalk.cyan(result.confidence)}`);
+
+  // Usage / cache info
+  if (renderOpts.fromCache) {
+    console.log();
+    console.log(chalk.gray('── Usage ───────────────────────────────────────────'));
+    console.log(`  ${chalk.green('Cached review (no API call)')}`);
+  } else if (options.verbose && result.tokenUsage) {
+    console.log();
+    console.log(chalk.gray('── Usage ───────────────────────────────────────────'));
+    const tracker = createUsageTracker(options.model);
+    tracker.addUsage(result.tokenUsage.inputTokens, result.tokenUsage.outputTokens);
+    console.log(`  ${tracker.formatUsage()}`);
+  }
 }
 
 function renderFinding(finding: ReviewFinding, type: 'critical' | 'suggestion' | 'positive'): void {

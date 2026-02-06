@@ -49,11 +49,16 @@ program
       if (options.watch) {
         await reviewer.watch();
       } else {
-        await reviewer.review(resolvedRange);
+        const result = await reviewer.review(resolvedRange);
+        // Exit 1 if there are critical findings (for CI usage)
+        if (result.critical.length > 0) {
+          process.exit(1);
+        }
       }
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : error);
-      process.exit(1);
+      // Exit 2 for errors (distinguishable from critical findings exit code 1)
+      process.exit(2);
     }
   });
 
