@@ -1,7 +1,7 @@
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { simpleGit, type SimpleGit } from 'simple-git';
+import { type SimpleGit, simpleGit } from 'simple-git';
 
 export interface FixtureRepo {
   path: string;
@@ -137,7 +137,7 @@ export async function createSecurityIssueRepo(): Promise<FixtureRepo> {
 
       'src/query.ts': [
         'export function findUser(name: string): string {',
-        '  return `SELECT * FROM users WHERE name = \'${name}\'`;',
+        "  return `SELECT * FROM users WHERE name = '${name}'`;",
         '}',
         '',
         'export function deleteUser(id: string): string {',

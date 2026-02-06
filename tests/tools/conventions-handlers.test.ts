@@ -79,12 +79,8 @@ describe('handleScanLintConfig', () => {
 describe('handleFindSimilarPatterns', () => {
   it('finds pattern matches in source files', async () => {
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
-      .mockResolvedValueOnce([
-        mockDirent('utils.ts', false),
-      ] as never);
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
+      .mockResolvedValueOnce([mockDirent('utils.ts', false)] as never);
 
     vi.mocked(readFile).mockResolvedValue(
       'import { foo } from "./bar";\nexport function doThing() {}\n',
@@ -100,9 +96,7 @@ describe('handleFindSimilarPatterns', () => {
   });
 
   it('returns message when no matches found', async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      mockDirent('empty.ts', false),
-    ] as never);
+    vi.mocked(readdir).mockResolvedValueOnce([mockDirent('empty.ts', false)] as never);
 
     vi.mocked(readFile).mockResolvedValue('const x = 1;\n');
 
@@ -115,13 +109,9 @@ describe('handleFindSimilarPatterns', () => {
   });
 
   it('skips node_modules', async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      mockDirent('node_modules', true),
-      mockDirent('src', true),
-    ] as never)
-    .mockResolvedValueOnce([
-      mockDirent('app.ts', false),
-    ] as never);
+    vi.mocked(readdir)
+      .mockResolvedValueOnce([mockDirent('node_modules', true), mockDirent('src', true)] as never)
+      .mockResolvedValueOnce([mockDirent('app.ts', false)] as never);
 
     vi.mocked(readFile).mockResolvedValue('const x = 1;\n');
 

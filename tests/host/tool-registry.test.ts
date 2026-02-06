@@ -6,7 +6,9 @@ import type { StdioTransport } from '../../src/host/transport.js';
 /**
  * Create a mock StdioTransport that returns predetermined responses.
  */
-function createMockTransport(toolsList: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>): StdioTransport {
+function createMockTransport(
+  toolsList: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>,
+): StdioTransport {
   return {
     request: vi.fn().mockImplementation(async (method: string) => {
       if (method === 'tools/list') {
@@ -167,9 +169,9 @@ describe('ToolRegistry', () => {
 
       await registry.registerServer('broken', transport);
 
-      await expect(
-        registry.callTool({ name: 'failing_tool', arguments: {} }),
-      ).rejects.toThrow(ToolServerError);
+      await expect(registry.callTool({ name: 'failing_tool', arguments: {} })).rejects.toThrow(
+        ToolServerError,
+      );
     });
   });
 
@@ -191,8 +193,14 @@ describe('ToolRegistry', () => {
 
       await registry.registerServer('file-context', transport);
 
-      const result1 = await registry.callTool({ name: 'read_file', arguments: { path: '/foo.ts' } });
-      const result2 = await registry.callTool({ name: 'read_file', arguments: { path: '/foo.ts' } });
+      const result1 = await registry.callTool({
+        name: 'read_file',
+        arguments: { path: '/foo.ts' },
+      });
+      const result2 = await registry.callTool({
+        name: 'read_file',
+        arguments: { path: '/foo.ts' },
+      });
 
       expect(result1.content).toBe('response 1');
       expect(result2.content).toBe('response 1'); // Same cached result
@@ -216,8 +224,14 @@ describe('ToolRegistry', () => {
 
       await registry.registerServer('file-context', transport);
 
-      const result1 = await registry.callTool({ name: 'read_file', arguments: { path: '/foo.ts' } });
-      const result2 = await registry.callTool({ name: 'read_file', arguments: { path: '/bar.ts' } });
+      const result1 = await registry.callTool({
+        name: 'read_file',
+        arguments: { path: '/foo.ts' },
+      });
+      const result2 = await registry.callTool({
+        name: 'read_file',
+        arguments: { path: '/bar.ts' },
+      });
 
       expect(result1.content).toBe('response 1');
       expect(result2.content).toBe('response 2');
@@ -229,7 +243,11 @@ describe('ToolRegistry', () => {
       const transport = {
         request: vi.fn().mockImplementation(async (method: string) => {
           if (method === 'tools/list') {
-            return { tools: [{ name: 'find_similar_patterns', description: 'Search patterns', inputSchema: {} }] };
+            return {
+              tools: [
+                { name: 'find_similar_patterns', description: 'Search patterns', inputSchema: {} },
+              ],
+            };
           }
           callCount++;
           return {
@@ -241,8 +259,14 @@ describe('ToolRegistry', () => {
 
       await registry.registerServer('conventions', transport);
 
-      const result1 = await registry.callTool({ name: 'find_similar_patterns', arguments: { pattern: 'foo' } });
-      const result2 = await registry.callTool({ name: 'find_similar_patterns', arguments: { pattern: 'foo' } });
+      const result1 = await registry.callTool({
+        name: 'find_similar_patterns',
+        arguments: { pattern: 'foo' },
+      });
+      const result2 = await registry.callTool({
+        name: 'find_similar_patterns',
+        arguments: { pattern: 'foo' },
+      });
 
       expect(result1.content).toBe('response 1');
       expect(result2.content).toBe('response 2');
@@ -272,8 +296,14 @@ describe('ToolRegistry', () => {
 
       await registry.registerServer('file-context', transport);
 
-      const result1 = await registry.callTool({ name: 'read_file', arguments: { path: '/fail.ts' } });
-      const result2 = await registry.callTool({ name: 'read_file', arguments: { path: '/fail.ts' } });
+      const result1 = await registry.callTool({
+        name: 'read_file',
+        arguments: { path: '/fail.ts' },
+      });
+      const result2 = await registry.callTool({
+        name: 'read_file',
+        arguments: { path: '/fail.ts' },
+      });
 
       expect(result1.isError).toBe(true);
       expect(result2.content).toBe('success');

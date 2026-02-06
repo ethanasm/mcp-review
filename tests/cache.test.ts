@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cacheReview, clearCache, getCacheKey, getCachedReview } from '../src/cache.js';
 import type { Config } from '../src/config.js';
 import type { ReviewResult } from '../src/reviewer.js';
@@ -32,7 +32,10 @@ const sampleResult: ReviewResult = {
 let projectRoot: string;
 
 beforeEach(async () => {
-  projectRoot = join(tmpdir(), `mcp-review-cache-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  projectRoot = join(
+    tmpdir(),
+    `mcp-review-cache-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   await mkdir(projectRoot, { recursive: true });
 });
 
@@ -64,8 +67,16 @@ describe('getCacheKey', () => {
   });
 
   it('produces different keys for different configs', () => {
-    const key1 = getCacheKey('diff', makeConfig({ focus: ['security'] }), 'claude-sonnet-4-20250514');
-    const key2 = getCacheKey('diff', makeConfig({ focus: ['performance'] }), 'claude-sonnet-4-20250514');
+    const key1 = getCacheKey(
+      'diff',
+      makeConfig({ focus: ['security'] }),
+      'claude-sonnet-4-20250514',
+    );
+    const key2 = getCacheKey(
+      'diff',
+      makeConfig({ focus: ['performance'] }),
+      'claude-sonnet-4-20250514',
+    );
     expect(key1).not.toBe(key2);
   });
 });
@@ -84,7 +95,12 @@ describe('cacheReview and getCachedReview', () => {
 
   it('cache miss returns null', async () => {
     const config = makeConfig();
-    const result = await getCachedReview('nonexistent diff', config, 'claude-sonnet-4-20250514', projectRoot);
+    const result = await getCachedReview(
+      'nonexistent diff',
+      config,
+      'claude-sonnet-4-20250514',
+      projectRoot,
+    );
     expect(result).toBeNull();
   });
 

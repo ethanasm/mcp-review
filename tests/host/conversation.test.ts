@@ -6,7 +6,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 // Mock Anthropic SDK
 const mockCreate = vi.fn().mockResolvedValue({
-  content: [{ type: 'text', text: '```json\n{"critical":[],"suggestions":[],"positive":[],"confidence":"high"}\n```' }],
+  content: [
+    {
+      type: 'text',
+      text: '```json\n{"critical":[],"suggestions":[],"positive":[],"confidence":"high"}\n```',
+    },
+  ],
   stop_reason: 'end_turn',
   usage: { input_tokens: 100, output_tokens: 50 },
 });
@@ -178,7 +183,12 @@ describe('ConversationManager', () => {
           usage: { input_tokens: 50, output_tokens: 30 },
         })
         .mockResolvedValueOnce({
-          content: [{ type: 'text', text: '```json\n{"critical":[],"suggestions":[],"positive":[],"confidence":"high"}\n```' }],
+          content: [
+            {
+              type: 'text',
+              text: '```json\n{"critical":[],"suggestions":[],"positive":[],"confidence":"high"}\n```',
+            },
+          ],
           stop_reason: 'end_turn',
           usage: { input_tokens: 100, output_tokens: 50 },
         });

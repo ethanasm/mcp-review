@@ -139,7 +139,9 @@ describe('shouldIgnoreFile', () => {
   });
 
   it('matches **/ prefix pattern', () => {
-    expect(shouldIgnoreFile('src/deep/nested/file.generated.ts', ['**/file.generated.ts'])).toBe(true);
+    expect(shouldIgnoreFile('src/deep/nested/file.generated.ts', ['**/file.generated.ts'])).toBe(
+      true,
+    );
   });
 
   it('escapes regex special characters in patterns', () => {

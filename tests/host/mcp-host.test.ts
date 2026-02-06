@@ -74,9 +74,7 @@ describe('MCPHost', () => {
       // Each server gets: start(), request('initialize'), notify('notifications/initialized'), request('tools/list')
       // 4 servers * 2 requests = 8 request calls
       const requestCalls = mockTransport.request.mock.calls;
-      const initCalls = requestCalls.filter(
-        (c: unknown[]) => c[0] === 'initialize',
-      );
+      const initCalls = requestCalls.filter((c: unknown[]) => c[0] === 'initialize');
       expect(initCalls.length).toBeGreaterThanOrEqual(4);
     });
 
@@ -99,9 +97,7 @@ describe('MCPHost', () => {
       // Should have attempted all 4 servers
       expect(StdioTransport).toHaveBeenCalledTimes(4);
       // Should have logged a warning
-      expect(spy).toHaveBeenCalledWith(
-        expect.stringContaining('Warning: Failed to start'),
-      );
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Warning: Failed to start'));
 
       spy.mockRestore();
     });
@@ -112,7 +108,10 @@ describe('MCPHost', () => {
       const host = new MCPHost(defaultOptions);
       await host.initialize();
 
-      expect(mockDebug).toHaveBeenCalledWith('mcp-host', expect.stringContaining('Started server:'));
+      expect(mockDebug).toHaveBeenCalledWith(
+        'mcp-host',
+        expect.stringContaining('Started server:'),
+      );
     });
   });
 
@@ -182,7 +181,10 @@ describe('MCPHost', () => {
 
       // Should throw because it's no longer initialized
       await expect(
-        host.runReview({ type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' }, { diff: '', stats: { filesChanged: 0, insertions: 0, deletions: 0, files: [] } }),
+        host.runReview(
+          { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
+          { diff: '', stats: { filesChanged: 0, insertions: 0, deletions: 0, files: [] } },
+        ),
       ).rejects.toThrow('not initialized');
     });
 

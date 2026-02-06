@@ -37,9 +37,7 @@ describe('handleFindImporters', () => {
   it('finds files that import the target file', async () => {
     // Project has two files: consumer.ts imports target.ts
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
       .mockResolvedValueOnce([
         mockDirent('target.ts', false),
         mockDirent('consumer.ts', false),
@@ -51,7 +49,7 @@ describe('handleFindImporters', () => {
         return "import { foo } from './target.js';\n\nconsole.log(foo);\n";
       }
       if (p.endsWith('target.ts')) {
-        return "export const foo = 42;\n";
+        return 'export const foo = 42;\n';
       }
       throw new Error('ENOENT');
     });
@@ -68,13 +66,8 @@ describe('handleFindImporters', () => {
 
   it('finds require() style imports', async () => {
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
-      .mockResolvedValueOnce([
-        mockDirent('lib.ts', false),
-        mockDirent('main.ts', false),
-      ] as never);
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
+      .mockResolvedValueOnce([mockDirent('lib.ts', false), mockDirent('main.ts', false)] as never);
 
     vi.mocked(readFile).mockImplementation(async (path) => {
       const p = String(path);
@@ -82,7 +75,7 @@ describe('handleFindImporters', () => {
         return "const lib = require('./lib');\n";
       }
       if (p.endsWith('lib.ts')) {
-        return "module.exports = {};\n";
+        return 'module.exports = {};\n';
       }
       throw new Error('ENOENT');
     });
@@ -97,9 +90,7 @@ describe('handleFindImporters', () => {
   });
 
   it('returns message when no importers found', async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      mockDirent('lonely.ts', false),
-    ] as never);
+    vi.mocked(readdir).mockResolvedValueOnce([mockDirent('lonely.ts', false)] as never);
 
     vi.mocked(readFile).mockImplementation(async () => {
       return 'const x = 1;\n';
@@ -120,15 +111,13 @@ describe('handleFindImporters', () => {
         mockDirent('dist', true),
         mockDirent('src', true),
       ] as never)
-      .mockResolvedValueOnce([
-        mockDirent('app.ts', false),
-      ] as never);
+      .mockResolvedValueOnce([mockDirent('app.ts', false)] as never);
 
     vi.mocked(readFile).mockImplementation(async () => {
       return 'const x = 1;\n';
     });
 
-    const result = await handleFindImporters({
+    await handleFindImporters({
       file_path: 'src/app.ts',
       project_root: '/project',
     });
@@ -153,9 +142,7 @@ describe('handleFindExports', () => {
   });
 
   it('finds default exports', async () => {
-    vi.mocked(readFile).mockResolvedValueOnce(
-      'export default function myFunc() { return 1; }\n',
-    );
+    vi.mocked(readFile).mockResolvedValueOnce('export default function myFunc() { return 1; }\n');
 
     const result = await handleFindExports({ file_path: '/project/src/main.ts' });
 
@@ -182,9 +169,7 @@ describe('handleFindExports', () => {
   });
 
   it('finds export list syntax', async () => {
-    vi.mocked(readFile).mockResolvedValueOnce(
-      'const a = 1;\nconst b = 2;\nexport { a, b };\n',
-    );
+    vi.mocked(readFile).mockResolvedValueOnce('const a = 1;\nconst b = 2;\nexport { a, b };\n');
 
     const result = await handleFindExports({ file_path: '/project/src/values.ts' });
 
@@ -215,9 +200,9 @@ describe('handleFindExports', () => {
   it('throws on unreadable file', async () => {
     vi.mocked(readFile).mockRejectedValueOnce(new Error('ENOENT'));
 
-    await expect(
-      handleFindExports({ file_path: '/project/src/missing.ts' }),
-    ).rejects.toThrow('Cannot read file');
+    await expect(handleFindExports({ file_path: '/project/src/missing.ts' })).rejects.toThrow(
+      'Cannot read file',
+    );
   });
 });
 
@@ -325,9 +310,7 @@ describe('handleFindTestFiles', () => {
 describe('handleFindTypeReferences', () => {
   it('finds type references across files', async () => {
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
       .mockResolvedValueOnce([
         mockDirent('types.ts', false),
         mockDirent('consumer.ts', false),
@@ -355,9 +338,7 @@ describe('handleFindTypeReferences', () => {
   });
 
   it('matches whole words only', async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      mockDirent('code.ts', false),
-    ] as never);
+    vi.mocked(readdir).mockResolvedValueOnce([mockDirent('code.ts', false)] as never);
 
     vi.mocked(readFile).mockResolvedValueOnce(
       'const Config = 1;\nconst MyConfig = 2;\nconst ConfigExtra = 3;\n',
@@ -375,9 +356,7 @@ describe('handleFindTypeReferences', () => {
   });
 
   it('returns message when no references found', async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      mockDirent('code.ts', false),
-    ] as never);
+    vi.mocked(readdir).mockResolvedValueOnce([mockDirent('code.ts', false)] as never);
 
     vi.mocked(readFile).mockResolvedValueOnce('const x = 1;\n');
 
@@ -390,9 +369,7 @@ describe('handleFindTypeReferences', () => {
   });
 
   it('handles regex special characters in type names', async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      mockDirent('code.ts', false),
-    ] as never);
+    vi.mocked(readdir).mockResolvedValueOnce([mockDirent('code.ts', false)] as never);
 
     vi.mocked(readFile).mockResolvedValueOnce('const x = 1;\n');
 
@@ -407,9 +384,7 @@ describe('handleFindTypeReferences', () => {
 
   it('skips unreadable files without crashing', async () => {
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
       .mockResolvedValueOnce([
         mockDirent('broken.ts', false),
         mockDirent('good.ts', false),
@@ -433,9 +408,7 @@ describe('handleFindTypeReferences', () => {
 describe('handleFindImporters edge cases', () => {
   it('finds non-relative (bare) imports', async () => {
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
       .mockResolvedValueOnce([
         mockDirent('target.ts', false),
         mockDirent('consumer.ts', false),
@@ -463,9 +436,7 @@ describe('handleFindImporters edge cases', () => {
 
   it('skips unreadable files in import scan', async () => {
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
       .mockResolvedValueOnce([
         mockDirent('broken.ts', false),
         mockDirent('good.ts', false),
@@ -497,9 +468,7 @@ describe('handleFindImporters edge cases', () => {
 
   it('handles dynamic import() syntax', async () => {
     vi.mocked(readdir)
-      .mockResolvedValueOnce([
-        mockDirent('src', true),
-      ] as never)
+      .mockResolvedValueOnce([mockDirent('src', true)] as never)
       .mockResolvedValueOnce([
         mockDirent('target.ts', false),
         mockDirent('consumer.ts', false),

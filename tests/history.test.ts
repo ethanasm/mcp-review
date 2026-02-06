@@ -23,10 +23,10 @@ vi.mock('chalk', () => {
 const { readFile, writeFile } = await import('node:fs/promises');
 
 import {
+  type UsageHistoryEntry,
   appendUsageHistory,
   formatUsageReport,
   getUsageHistory,
-  type UsageHistoryEntry,
 } from '../src/history.js';
 
 beforeEach(() => {
@@ -58,13 +58,29 @@ describe('appendUsageHistory', () => {
 
   it('appends to existing history', async () => {
     const existing: UsageHistoryEntry[] = [
-      { timestamp: 1, range: 'old', model: 'm', inputTokens: 0, outputTokens: 0, estimatedCost: 0, cached: false },
+      {
+        timestamp: 1,
+        range: 'old',
+        model: 'm',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+        cached: false,
+      },
     ];
     vi.mocked(readFile).mockResolvedValue(JSON.stringify(existing));
     vi.mocked(writeFile).mockResolvedValue(undefined);
 
     await appendUsageHistory(
-      { timestamp: 2, range: 'new', model: 'm', inputTokens: 100, outputTokens: 50, estimatedCost: 0.005, cached: false },
+      {
+        timestamp: 2,
+        range: 'new',
+        model: 'm',
+        inputTokens: 100,
+        outputTokens: 50,
+        estimatedCost: 0.005,
+        cached: false,
+      },
       '/project',
     );
 
@@ -78,7 +94,15 @@ describe('appendUsageHistory', () => {
     vi.mocked(writeFile).mockResolvedValue(undefined);
 
     await appendUsageHistory(
-      { timestamp: 1, range: 'test', model: 'm', inputTokens: 0, outputTokens: 0, estimatedCost: 0, cached: true },
+      {
+        timestamp: 1,
+        range: 'test',
+        model: 'm',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+        cached: true,
+      },
       '/project',
     );
 
@@ -136,7 +160,15 @@ describe('formatUsageReport', () => {
   it('shows totals and recent entries', () => {
     const entries: UsageHistoryEntry[] = [
       { ...sampleEntry },
-      { timestamp: 1700000001000, range: 'staged changes', model: 'claude-sonnet-4-20250514', inputTokens: 0, outputTokens: 0, estimatedCost: 0, cached: true },
+      {
+        timestamp: 1700000001000,
+        range: 'staged changes',
+        model: 'claude-sonnet-4-20250514',
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: 0,
+        cached: true,
+      },
     ];
 
     const report = formatUsageReport(entries);
@@ -150,7 +182,7 @@ describe('formatUsageReport', () => {
 
   it('shows correct cost total', () => {
     const entries: UsageHistoryEntry[] = [
-      { ...sampleEntry, estimatedCost: 0.10 },
+      { ...sampleEntry, estimatedCost: 0.1 },
       { ...sampleEntry, estimatedCost: 0.25 },
     ];
 
