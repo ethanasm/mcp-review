@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import Anthropic from '@anthropic-ai/sdk';
 import chalk from 'chalk';
 import type { Ora } from 'ora';
 import type { Config } from '../config.js';
 import { shouldIgnoreFile } from '../config.js';
 import type { DiffStats } from '../git/commands.js';
 import type { ResolvedRange } from '../git/resolver.js';
+import type { LLMMessage, LLMProvider, ToolDefinition, ToolUseBlock } from '../llm/provider.js';
 import { debug, timer } from '../logger.js';
 import { getInitialPrompt, getSystemPrompt } from '../prompts/system.js';
 import { getFocusInstructions } from '../prompts/templates.js';
@@ -36,12 +36,12 @@ const TOOL_LABELS: Record<string, string> = {
 /**
  * Build a human-readable spinner message for a set of tool calls.
  */
-function describeToolCalls(blocks: Anthropic.ToolUseBlock[]): string {
+function describeToolCalls(blocks: ToolUseBlock[]): string {
   if (blocks.length === 0) return 'Gathering context...';
 
   const descriptions = blocks.map((block) => {
     const label = TOOL_LABELS[block.name] ?? block.name;
-    const input = block.input as Record<string, unknown>;
+    const input = block.input;
 
     // Extract the most relevant argument for context
     const file = input.path ?? input.file ?? input.target_file;
@@ -149,63 +149,15 @@ export interface ConversationOptions extends Config {
  * Conversation Manager
  *
  * Manages the LLM conversation state and orchestrates the review flow.
+ * Provider-agnostic — works with any LLMProvider implementation.
  */
-/** Max retries for rate-limit (429) errors. */
-const MAX_RETRIES = 3;
-
-/** Base delay in ms for exponential backoff on rate-limit errors. */
-const RETRY_BASE_DELAY_MS = 30_000;
-
 export class ConversationManager {
   private options: ConversationOptions;
-  private client: Anthropic;
+  private provider: LLMProvider;
 
-  constructor(options: ConversationOptions) {
+  constructor(options: ConversationOptions, provider: LLMProvider) {
     this.options = options;
-    this.client = new Anthropic();
-  }
-
-  /**
-   * Call the Anthropic messages API with automatic retry on rate-limit errors.
-   * Uses exponential backoff: 30s, 60s, 120s.
-   */
-  private async callWithRetry(
-    params: Anthropic.MessageCreateParamsNonStreaming,
-    spinner?: Ora,
-  ): Promise<Anthropic.Message> {
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        return await this.client.messages.create(params);
-      } catch (error) {
-        const isRateLimit =
-          error instanceof Anthropic.RateLimitError ||
-          (error instanceof Anthropic.APIError && error.status === 429);
-
-        if (!isRateLimit || attempt >= MAX_RETRIES) {
-          throw error;
-        }
-
-        // Parse retry-after header if available, otherwise use exponential backoff
-        const retryAfter =
-          error instanceof Anthropic.APIError ? error.headers?.['retry-after'] : undefined;
-        const delaySec = retryAfter ? Number.parseInt(retryAfter, 10) : 0;
-        const delayMs = delaySec > 0 ? delaySec * 1000 : RETRY_BASE_DELAY_MS * 2 ** attempt;
-
-        debug(
-          'llm',
-          `Rate limited (429). Retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(delayMs / 1000)}s`,
-        );
-
-        if (spinner) {
-          spinner.text = `Rate limited — retrying in ${Math.round(delayMs / 1000)}s...`;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    }
-
-    // Should never reach here, but TypeScript needs it
-    throw new Error('Exhausted retries');
+    this.provider = provider;
   }
 
   /**
@@ -324,15 +276,15 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
       debug('review', 'Skipping file pre-load: diff was truncated to fit context window');
     }
 
-    // Get available tools
-    const tools = toolRegistry.getAvailableTools().map((t) => ({
+    // Get available tools in the shared ToolDefinition format
+    const tools: ToolDefinition[] = toolRegistry.getAvailableTools().map((t) => ({
       name: t.name,
       description: t.description,
-      input_schema: t.inputSchema as Anthropic.Tool['input_schema'],
+      input_schema: t.inputSchema as Record<string, unknown>,
     }));
 
-    // Build initial messages using focus-aware prompt
-    const messages: Anthropic.MessageParam[] = [
+    // Build initial messages
+    const messages: LLMMessage[] = [
       {
         role: 'user',
         content: this.buildInitialPrompt(diff, stats, fileContents),
@@ -347,34 +299,31 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
     }
 
     const endFirstCall = timer('llm', `API call #${++turnNumber}`);
-    let response = await this.callWithRetry(
-      {
-        model: this.options.model,
-        max_tokens: 4096,
-        system: getSystemPrompt(this.options),
-        tools,
-        messages,
-      },
-      spinner,
-    );
+    let response = await this.provider.call({
+      model: this.options.model,
+      max_tokens: 4096,
+      system: getSystemPrompt(this.options),
+      tools,
+      messages,
+    });
     endFirstCall();
 
-    tracker.addUsage(response.usage.input_tokens, response.usage.output_tokens);
+    tracker.addUsage(response.usage.inputTokens, response.usage.outputTokens);
     debug(
       'llm',
-      `Turn ${turnNumber}: stop_reason=${response.stop_reason}, tokens=${response.usage.input_tokens}in/${response.usage.output_tokens}out`,
+      `Turn ${turnNumber}: stopReason=${response.stopReason}, tokens=${response.usage.inputTokens}in/${response.usage.outputTokens}out`,
     );
 
     // Handle tool calls in a loop (capped at MAX_TOOL_ROUNDS)
     let toolRounds = 0;
-    while (response.stop_reason === 'tool_use') {
+    while (response.stopReason === 'tool_use') {
       toolRounds++;
       const assistantContent = response.content;
       messages.push({ role: 'assistant', content: assistantContent });
 
       // Process tool calls in parallel
       const toolUseBlocks = assistantContent.filter(
-        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
+        (block): block is ToolUseBlock => block.type === 'tool_use',
       );
 
       if (spinner) {
@@ -392,7 +341,7 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
           const endTool = timer('tools', `tool: ${block.name}`);
           const result = await toolRegistry.callTool({
             name: block.name,
-            arguments: block.input as Record<string, unknown>,
+            arguments: block.input,
           });
           endTool();
           return {
@@ -422,22 +371,19 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
 
       // Continue conversation — drop tools if at limit so the model must produce text
       const endApiCall = timer('llm', `API call #${++turnNumber}`);
-      response = await this.callWithRetry(
-        {
-          model: this.options.model,
-          max_tokens: 4096,
-          system: getSystemPrompt(this.options),
-          ...(atLimit ? {} : { tools }),
-          messages,
-        },
-        spinner,
-      );
+      response = await this.provider.call({
+        model: this.options.model,
+        max_tokens: 4096,
+        system: getSystemPrompt(this.options),
+        ...(atLimit ? {} : { tools }),
+        messages,
+      });
       endApiCall();
 
-      tracker.addUsage(response.usage.input_tokens, response.usage.output_tokens);
+      tracker.addUsage(response.usage.inputTokens, response.usage.outputTokens);
       debug(
         'llm',
-        `Turn ${turnNumber}: stop_reason=${response.stop_reason}, tokens=${response.usage.input_tokens}in/${response.usage.output_tokens}out`,
+        `Turn ${turnNumber}: stopReason=${response.stopReason}, tokens=${response.usage.inputTokens}in/${response.usage.outputTokens}out`,
       );
     }
 

@@ -13,9 +13,13 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-sonnet-4-20250514': { inputPerMTok: 3, outputPerMTok: 15 },
   'claude-opus-4-20250514': { inputPerMTok: 15, outputPerMTok: 75 },
   'claude-haiku-3-5-20241022': { inputPerMTok: 0.8, outputPerMTok: 4 },
+  'deepseek-chat': { inputPerMTok: 0.14, outputPerMTok: 0.28 },
+  'kimi-k2.5': { inputPerMTok: 0.6, outputPerMTok: 3 },
+  'qwen/qwen3-coder': { inputPerMTok: 0, outputPerMTok: 0 },
+  'qwen/qwen3-coder:free': { inputPerMTok: 0, outputPerMTok: 0 },
 };
 
-const DEFAULT_PRICING: ModelPricing = { inputPerMTok: 3, outputPerMTok: 15 };
+const DEFAULT_PRICING: ModelPricing = { inputPerMTok: 1, outputPerMTok: 5 };
 
 export interface UsageTracker {
   addUsage(inputTokens: number, outputTokens: number): void;

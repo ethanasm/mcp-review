@@ -22,7 +22,13 @@ program
   .option('--since <date>', 'Review commits since date (e.g., "yesterday", "2024-01-01")')
   .option('--focus <areas>', 'Focus areas: security, performance, consistency (comma-separated)')
   .option('--watch', 'Watch mode - review each commit as it happens')
-  .option('--model <model>', 'Claude model to use')
+  .option('--model <model>', 'LLM model to use')
+  .option('--provider <provider>', 'LLM provider: anthropic, openai (default: anthropic)')
+  .option('--base-url <url>', 'Base URL for OpenAI-compatible API')
+  .option(
+    '--api-key-env <var>',
+    'Environment variable name for API key (default: provider-specific)',
+  )
   .option('--output <format>', 'Output format: terminal, json', 'terminal')
   .option('--verbose', 'Enable verbose output')
   .option('--usage-report', 'Display usage history and cost summary')
@@ -50,6 +56,9 @@ program
       const reviewer = createReviewer({
         ...projectConfig,
         model: options.model ?? projectConfig.model,
+        provider: options.provider ?? projectConfig.provider,
+        base_url: options.baseUrl ?? projectConfig.base_url,
+        api_key_env: options.apiKeyEnv ?? projectConfig.api_key_env,
         focus: options.focus?.split(',') ?? projectConfig.focus,
         verbose: options.verbose,
         outputFormat: options.output,

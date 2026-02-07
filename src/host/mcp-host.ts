@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import type { Config } from '../config.js';
 import type { ResolvedRange } from '../git/resolver.js';
+import { createProvider } from '../llm/index.js';
 import { debug, timer } from '../logger.js';
 import type { ReviewResult } from '../reviewer.js';
 import { ConversationManager } from './conversation.js';
@@ -54,7 +55,8 @@ export class MCPHost {
 
   constructor(options: MCPHostOptions) {
     this.toolRegistry = new ToolRegistry();
-    this.conversation = new ConversationManager(options);
+    const provider = createProvider(options);
+    this.conversation = new ConversationManager(options, provider);
     this.tokenBudget = DEFAULT_TOKEN_BUDGET;
   }
 

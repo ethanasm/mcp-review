@@ -5,6 +5,9 @@ import { z } from 'zod';
 
 const ConfigSchema = z.object({
   model: z.string().default('claude-sonnet-4-20250514'),
+  provider: z.enum(['anthropic', 'openai']).default('anthropic'),
+  base_url: z.string().optional(),
+  api_key_env: z.string().optional(),
   focus: z.array(z.string()).default([]),
   ignore: z.array(z.string()).default([]),
   conventions: z.array(z.string()).default([]),
@@ -21,6 +24,10 @@ export const KNOWN_MODELS = [
   'claude-sonnet-4-20250514',
   'claude-opus-4-20250514',
   'claude-haiku-3-5-20241022',
+  'deepseek-chat',
+  'kimi-k2.5',
+  'qwen/qwen3-coder',
+  'qwen/qwen3-coder:free',
 ] as const;
 
 /**

@@ -49,12 +49,12 @@ describe('createUsageTracker', () => {
     });
 
     it('uses default pricing for unknown model', () => {
-      // Default: $3/MTok input, $15/MTok output
+      // Default: $1/MTok input, $5/MTok output
       const tracker = createUsageTracker('some-unknown-model');
       tracker.addUsage(1_000_000, 1_000_000);
 
       const total = tracker.getTotal();
-      expect(total.estimatedCost).toBeCloseTo(18, 2); // $3 + $15
+      expect(total.estimatedCost).toBeCloseTo(6, 2); // $1 + $5
     });
 
     it('handles fractional token counts', () => {

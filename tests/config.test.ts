@@ -23,6 +23,7 @@ describe('loadConfig', () => {
     const config = await loadConfig('/fake/dir');
     expect(config).toEqual({
       model: 'claude-sonnet-4-20250514',
+      provider: 'anthropic',
       focus: [],
       ignore: [],
       conventions: [],

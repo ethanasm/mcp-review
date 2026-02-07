@@ -1,26 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-
-// We need to test that the focus area logic in buildInitialPrompt works correctly.
-// Since buildInitialPrompt is private, we test it indirectly through the messages
-// passed to the Anthropic client.
-
-// Mock Anthropic SDK
-const mockCreate = vi.fn().mockResolvedValue({
-  content: [
-    {
-      type: 'text',
-      text: '```json\n{"critical":[],"suggestions":[],"positive":[],"confidence":"high"}\n```',
-    },
-  ],
-  stop_reason: 'end_turn',
-  usage: { input_tokens: 100, output_tokens: 50 },
-});
-
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: vi.fn(() => ({
-    messages: { create: mockCreate },
-  })),
-}));
+import type { LLMProvider, LLMRequest, LLMResponse } from '../../src/llm/provider.js';
 
 vi.mock('../../src/usage.js', () => ({
   createUsageTracker: () => ({
@@ -37,6 +16,32 @@ vi.mock('../../src/logger.js', () => ({
 
 import { ConversationManager, truncateDiff } from '../../src/host/conversation.js';
 
+/** Helper to create a mock LLMProvider that records call args and returns canned responses. */
+function createMockProvider(responses?: LLMResponse[]) {
+  const defaultResponse: LLMResponse = {
+    content: [
+      {
+        type: 'text',
+        text: '```json\n{"critical":[],"suggestions":[],"positive":[],"confidence":"high"}\n```',
+      },
+    ],
+    stopReason: 'end_turn',
+    usage: { inputTokens: 100, outputTokens: 50 },
+  };
+
+  const queue = responses ? [...responses] : [];
+  const calls: LLMRequest[] = [];
+
+  const provider: LLMProvider = {
+    async call(request: LLMRequest): Promise<LLMResponse> {
+      calls.push(request);
+      return queue.length > 0 ? queue.shift()! : defaultResponse;
+    },
+  };
+
+  return { provider, calls };
+}
+
 const mockToolRegistry = {
   getAvailableTools: () => [],
   callTool: vi.fn(),
@@ -47,18 +52,22 @@ const defaultPrefetched = {
   stats: { filesChanged: 3, insertions: 10, deletions: 5, files: ['foo.ts', 'bar.ts', 'baz.ts'] },
 };
 
+const defaultConfig = {
+  model: 'claude-sonnet-4-20250514',
+  provider: 'anthropic' as const,
+  focus: [] as string[],
+  ignore: [] as string[],
+  conventions: [] as string[],
+  max_files: 20,
+  context_lines: 5,
+  no_cache: false,
+};
+
 describe('ConversationManager', () => {
   describe('focus area wiring', () => {
     it('uses security template when focus includes security', async () => {
-      const manager = new ConversationManager({
-        model: 'claude-sonnet-4-20250514',
-        focus: ['security'],
-        ignore: [],
-        conventions: [],
-        max_files: 20,
-        context_lines: 5,
-        no_cache: false,
-      });
+      const { provider, calls } = createMockProvider();
+      const manager = new ConversationManager({ ...defaultConfig, focus: ['security'] }, provider);
 
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
@@ -66,24 +75,17 @@ describe('ConversationManager', () => {
         defaultPrefetched,
       );
 
-      // Check that the user message includes security-focused content
-      const callArgs = mockCreate.mock.calls[0]![0];
-      const userMessage = callArgs.messages[0].content;
+      const userMessage = calls[0]!.messages[0]!.content as string;
       expect(userMessage).toContain('Input validation');
       expect(userMessage).toContain('Focus Areas');
     });
 
     it('uses performance template when focus includes performance', async () => {
-      mockCreate.mockClear();
-      const manager = new ConversationManager({
-        model: 'claude-sonnet-4-20250514',
-        focus: ['performance'],
-        ignore: [],
-        conventions: [],
-        max_files: 20,
-        context_lines: 5,
-        no_cache: false,
-      });
+      const { provider, calls } = createMockProvider();
+      const manager = new ConversationManager(
+        { ...defaultConfig, focus: ['performance'] },
+        provider,
+      );
 
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
@@ -91,23 +93,17 @@ describe('ConversationManager', () => {
         defaultPrefetched,
       );
 
-      const callArgs = mockCreate.mock.calls[0]![0];
-      const userMessage = callArgs.messages[0].content;
+      const userMessage = calls[0]!.messages[0]!.content as string;
       expect(userMessage).toContain('N+1 queries');
       expect(userMessage).toContain('Focus Areas');
     });
 
     it('combines security and performance templates when both are focused', async () => {
-      mockCreate.mockClear();
-      const manager = new ConversationManager({
-        model: 'claude-sonnet-4-20250514',
-        focus: ['security', 'performance'],
-        ignore: [],
-        conventions: [],
-        max_files: 20,
-        context_lines: 5,
-        no_cache: false,
-      });
+      const { provider, calls } = createMockProvider();
+      const manager = new ConversationManager(
+        { ...defaultConfig, focus: ['security', 'performance'] },
+        provider,
+      );
 
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
@@ -115,24 +111,18 @@ describe('ConversationManager', () => {
         defaultPrefetched,
       );
 
-      const callArgs = mockCreate.mock.calls[0]![0];
-      const userMessage = callArgs.messages[0].content;
+      const userMessage = calls[0]!.messages[0]!.content as string;
       expect(userMessage).toContain('Input validation');
       expect(userMessage).toContain('N+1 queries');
       expect(userMessage).toContain('Analyzing 3 files');
     });
 
     it('falls back to general prompt when no recognized focus areas', async () => {
-      mockCreate.mockClear();
-      const manager = new ConversationManager({
-        model: 'claude-sonnet-4-20250514',
-        focus: ['consistency'],
-        ignore: [],
-        conventions: [],
-        max_files: 20,
-        context_lines: 5,
-        no_cache: false,
-      });
+      const { provider, calls } = createMockProvider();
+      const manager = new ConversationManager(
+        { ...defaultConfig, focus: ['consistency'] },
+        provider,
+      );
 
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
@@ -140,23 +130,13 @@ describe('ConversationManager', () => {
         defaultPrefetched,
       );
 
-      const callArgs = mockCreate.mock.calls[0]![0];
-      const userMessage = callArgs.messages[0].content;
-      // Should use the general getInitialPrompt
+      const userMessage = calls[0]!.messages[0]!.content as string;
       expect(userMessage).toContain('Please review the following code changes');
     });
 
     it('falls back to general prompt when no focus areas set', async () => {
-      mockCreate.mockClear();
-      const manager = new ConversationManager({
-        model: 'claude-sonnet-4-20250514',
-        focus: [],
-        ignore: [],
-        conventions: [],
-        max_files: 20,
-        context_lines: 5,
-        no_cache: false,
-      });
+      const { provider, calls } = createMockProvider();
+      const manager = new ConversationManager(defaultConfig, provider);
 
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
@@ -164,8 +144,7 @@ describe('ConversationManager', () => {
         defaultPrefetched,
       );
 
-      const callArgs = mockCreate.mock.calls[0]![0];
-      const userMessage = callArgs.messages[0].content;
+      const userMessage = calls[0]!.messages[0]!.content as string;
       expect(userMessage).toContain('Please review the following code changes');
     });
   });
@@ -222,26 +201,24 @@ describe('ConversationManager', () => {
 
   describe('spinner progress updates', () => {
     it('updates spinner text during review phases', async () => {
-      // Set up a tool_use response followed by final response
-      mockCreate.mockClear();
-      mockCreate
-        .mockResolvedValueOnce({
-          content: [
-            { type: 'tool_use', id: 'call_1', name: 'read_file', input: { path: 'foo.ts' } },
-          ],
-          stop_reason: 'tool_use',
-          usage: { input_tokens: 50, output_tokens: 30 },
-        })
-        .mockResolvedValueOnce({
-          content: [
-            {
-              type: 'text',
-              text: '```json\n{"critical":[],"suggestions":[],"positive":[],"confidence":"high"}\n```',
-            },
-          ],
-          stop_reason: 'end_turn',
-          usage: { input_tokens: 100, output_tokens: 50 },
-        });
+      const toolUseResponse: LLMResponse = {
+        content: [{ type: 'tool_use', id: 'call_1', name: 'read_file', input: { path: 'foo.ts' } }],
+        stopReason: 'tool_use',
+        usage: { inputTokens: 50, outputTokens: 30 },
+      };
+
+      const finalResponse: LLMResponse = {
+        content: [
+          {
+            type: 'text',
+            text: '```json\n{"critical":[],"suggestions":[],"positive":[],"confidence":"high"}\n```',
+          },
+        ],
+        stopReason: 'end_turn',
+        usage: { inputTokens: 100, outputTokens: 50 },
+      };
+
+      const { provider } = createMockProvider([toolUseResponse, finalResponse]);
 
       const mockSpinner = {
         text: '',
@@ -258,15 +235,7 @@ describe('ConversationManager', () => {
         callTool: vi.fn().mockResolvedValue({ content: 'file contents', isError: false }),
       } as any;
 
-      const manager = new ConversationManager({
-        model: 'claude-sonnet-4-20250514',
-        focus: [],
-        ignore: [],
-        conventions: [],
-        max_files: 20,
-        context_lines: 5,
-        no_cache: false,
-      });
+      const manager = new ConversationManager(defaultConfig, provider);
 
       await manager.runReview(
         { type: 'range', from: 'HEAD~1', to: 'HEAD', display: 'test' },
@@ -275,10 +244,6 @@ describe('ConversationManager', () => {
         mockSpinner as any,
       );
 
-      // Verify spinner text was updated with expected progress messages
-      // The spinner.text assignments happen in sequence, so we check the calls
-      // We can't easily check all intermediate .text values, but we know
-      // that the spinner was passed and used
       expect(mockRegistry.callTool).toHaveBeenCalled();
     });
   });
