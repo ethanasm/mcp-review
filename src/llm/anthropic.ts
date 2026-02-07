@@ -18,13 +18,19 @@ const RETRY_BASE_DELAY_MS = 30_000;
 export interface AnthropicProviderOptions {
   /** Optional spinner for user feedback during retries. */
   spinner?: Ora;
+  /** API key. If not provided, reads from ANTHROPIC_API_KEY env var. */
+  apiKey?: string;
 }
 
 /**
  * Anthropic provider — wraps the Anthropic SDK and implements LLMProvider.
  */
 export function createAnthropicProvider(opts: AnthropicProviderOptions = {}): LLMProvider {
-  const client = new Anthropic();
+  const apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('Anthropic provider requires ANTHROPIC_API_KEY environment variable');
+  }
+  const client = new Anthropic({ apiKey });
 
   async function callWithRetry(
     params: Anthropic.MessageCreateParamsNonStreaming,

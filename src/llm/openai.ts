@@ -67,6 +67,10 @@ interface OpenAIChatResponse {
  */
 export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
   const { baseURL, apiKey } = opts;
+
+  if (!apiKey || apiKey.trim().length === 0) {
+    throw new Error('OpenAI provider requires a non-empty API key');
+  }
   // Ensure the URL ends with /chat/completions
   const endpoint = baseURL.replace(/\/+$/, '').endsWith('/chat/completions')
     ? baseURL
@@ -148,12 +152,17 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
           if (block.type === 'text') {
             textContent += block.text;
           } else if (block.type === 'tool_use') {
+            // Sanitize: only serialize plain-object inputs to prevent injection
+            const safeInput =
+              block.input && typeof block.input === 'object' && !Array.isArray(block.input)
+                ? block.input
+                : {};
             toolCalls.push({
               id: block.id,
               type: 'function',
               function: {
                 name: block.name,
-                arguments: JSON.stringify(block.input),
+                arguments: JSON.stringify(safeInput),
               },
             });
           }

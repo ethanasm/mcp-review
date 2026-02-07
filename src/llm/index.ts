@@ -43,5 +43,8 @@ export function createProvider(config: Config, spinner?: Ora): LLMProvider {
   }
 
   // Default: Anthropic
-  return createAnthropicProvider({ spinner });
+  const anthropicKeyEnv =
+    (config as Config & { api_key_env?: string }).api_key_env ?? 'ANTHROPIC_API_KEY';
+  const anthropicKey = process.env[anthropicKeyEnv];
+  return createAnthropicProvider({ apiKey: anthropicKey, spinner });
 }

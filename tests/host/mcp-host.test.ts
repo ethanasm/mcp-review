@@ -20,6 +20,11 @@ vi.mock('../../src/host/transport.js', () => ({
   StdioTransport: vi.fn(() => ({ ...mockTransport })),
 }));
 
+// Mock the LLM provider factory
+vi.mock('../../src/llm/index.js', () => ({
+  createProvider: vi.fn(() => ({ call: vi.fn() })),
+}));
+
 // Mock the ConversationManager
 const mockRunReview = vi.fn().mockResolvedValue({
   critical: [],
