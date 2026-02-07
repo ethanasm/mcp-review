@@ -62,6 +62,9 @@ curl -fsSL https://bun.sh/install | bash
 # Install dependencies
 bun install
 
+# Build the project
+bun run build
+
 # Copy environment template and add your API key
 cp .env.example .env
 ```
@@ -74,6 +77,40 @@ OPENROUTER_API_KEY=sk-or-...   # For OpenRouter models (qwen3-coder, etc.)
 DEEPSEEK_API_KEY=sk-...        # For DeepSeek
 MOONSHOT_API_KEY=sk-...        # For Kimi / Moonshot
 ```
+
+### Global install
+
+Link the CLI so you can run `mcp-review` from any git repository:
+
+```bash
+npm link
+```
+
+### Using in another project
+
+Navigate to any git repo and run `mcp-review` directly:
+
+```bash
+cd /path/to/your-project
+mcp-review --staged
+```
+
+Optionally, create a `.mcp-review.yml` in that project's root to customize review behavior:
+
+```yaml
+model: qwen3-coder
+focus:
+  - security
+  - performance
+ignore:
+  - "*.test.ts"
+  - dist
+conventions:
+  - "Use named exports"
+  - "Error messages should be user-facing"
+```
+
+See [Configuration](#configuration) for all available options.
 
 ## Development
 
