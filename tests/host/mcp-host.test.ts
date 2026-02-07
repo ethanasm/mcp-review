@@ -23,6 +23,7 @@ vi.mock('../../src/host/transport.js', () => ({
 // Mock the LLM provider factory
 vi.mock('../../src/llm/index.js', () => ({
   createProvider: vi.fn(() => ({ call: vi.fn() })),
+  resolveModelAlias: vi.fn(() => undefined),
 }));
 
 // Mock the ConversationManager

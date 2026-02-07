@@ -20,6 +20,9 @@ export type Config = z.infer<typeof ConfigSchema>;
 
 const CONFIG_FILES = ['.mcp-review.yml', '.mcp-review.yaml', '.mcp-review.json'];
 
+/** Known model aliases (short names like "qwen3-coder"). */
+export const MODEL_ALIAS_NAMES = ['qwen3-coder', 'deepseek', 'kimi'] as const;
+
 export const KNOWN_MODELS = [
   'claude-sonnet-4-20250514',
   'claude-opus-4-20250514',
@@ -28,6 +31,7 @@ export const KNOWN_MODELS = [
   'kimi-k2.5',
   'qwen/qwen3-coder',
   'qwen/qwen3-coder:free',
+  ...MODEL_ALIAS_NAMES,
 ] as const;
 
 /**

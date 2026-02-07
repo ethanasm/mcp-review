@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import type { Config } from '../config.js';
 import type { ResolvedRange } from '../git/resolver.js';
-import { createProvider } from '../llm/index.js';
+import { createProvider, resolveModelAlias } from '../llm/index.js';
 import { debug, timer } from '../logger.js';
 import type { ReviewResult } from '../reviewer.js';
 import { ConversationManager } from './conversation.js';
@@ -54,6 +54,19 @@ export class MCPHost {
   private tokensUsed = 0;
 
   constructor(options: MCPHostOptions) {
+    // Resolve model alias — replaces e.g. "qwen3-coder" with the real model ID
+    // and fills in provider/base_url/api_key_env from the alias table.
+    // Alias values override Zod defaults (provider defaults to 'anthropic') but
+    // explicit CLI overrides (base_url, api_key_env) still take precedence since
+    // they are merged in cli.ts before reaching here.
+    const alias = resolveModelAlias(options.model);
+    if (alias) {
+      options.model = alias.model;
+      options.provider = alias.provider;
+      options.base_url = options.base_url ?? alias.base_url;
+      options.api_key_env = options.api_key_env ?? alias.api_key_env;
+    }
+
     this.toolRegistry = new ToolRegistry();
     const provider = createProvider(options);
     this.conversation = new ConversationManager(options, provider);

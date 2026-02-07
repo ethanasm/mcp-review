@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadConfig, mergeConfig, shouldIgnoreFile } from '../src/config.js';
+import { KNOWN_MODELS, loadConfig, mergeConfig, shouldIgnoreFile } from '../src/config.js';
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
@@ -93,6 +93,22 @@ describe('mergeConfig', () => {
     const result = mergeConfig(base, { model: undefined });
     expect(result.model).toBe('claude-sonnet-4-20250514');
     expect(result.focus).toEqual(['perf']);
+  });
+});
+
+describe('KNOWN_MODELS', () => {
+  it('includes model alias names', () => {
+    const models = KNOWN_MODELS as readonly string[];
+    expect(models).toContain('qwen3-coder');
+    expect(models).toContain('deepseek');
+    expect(models).toContain('kimi');
+  });
+
+  it('includes full model IDs', () => {
+    const models = KNOWN_MODELS as readonly string[];
+    expect(models).toContain('claude-sonnet-4-20250514');
+    expect(models).toContain('deepseek-chat');
+    expect(models).toContain('qwen/qwen3-coder:free');
   });
 });
 
