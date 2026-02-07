@@ -7,7 +7,6 @@ dist/
 # Environment
 .env
 .env.local
-.mcp-review.yml
 
 # IDE
 .vscode/

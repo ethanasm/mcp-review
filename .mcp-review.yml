@@ -1,0 +1,11 @@
+model: qwen3-coder
+focus:
+  - security
+  - performance
+ignore:
+  - "*.test.ts"
+  - dist
+conventions:
+  - "Use named exports"
+  - "Error messages should be user-facing"
+context_lines: 3
