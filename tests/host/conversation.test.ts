@@ -4,6 +4,8 @@ import type { LLMProvider, LLMRequest, LLMResponse } from '../../src/llm/provide
 vi.mock('../../src/usage.js', () => ({
   createUsageTracker: () => ({
     addUsage: vi.fn(),
+    addTurn: vi.fn(),
+    getTurns: () => [],
     getTotal: () => ({ inputTokens: 100, outputTokens: 50, estimatedCost: 0.001 }),
     formatUsage: () => '100 in / 50 out',
   }),
@@ -12,6 +14,7 @@ vi.mock('../../src/usage.js', () => ({
 vi.mock('../../src/logger.js', () => ({
   debug: vi.fn(),
   timer: vi.fn(() => () => 0),
+  logPerformanceReport: vi.fn(),
 }));
 
 import { ConversationManager, truncateDiff } from '../../src/host/conversation.js';

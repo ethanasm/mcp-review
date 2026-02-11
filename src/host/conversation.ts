@@ -6,7 +6,7 @@ import { shouldIgnoreFile } from '../config.js';
 import type { DiffStats } from '../git/commands.js';
 import type { ResolvedRange } from '../git/resolver.js';
 import type { LLMMessage, LLMProvider, ToolDefinition, ToolUseBlock } from '../llm/provider.js';
-import { debug, timer } from '../logger.js';
+import { debug, logPerformanceReport, timer } from '../logger.js';
 import { getInitialPrompt, getSystemPrompt } from '../prompts/system.js';
 import { getFocusInstructions } from '../prompts/templates.js';
 import type { ReviewResult } from '../reviewer.js';
@@ -59,6 +59,30 @@ function describeToolCalls(blocks: ToolUseBlock[]): string {
   }
 
   return `${descriptions[0]} ${chalk.dim(`(+${descriptions.length - 1} more)`)}`;
+}
+
+/**
+ * Estimate the total character count of the messages array.
+ * Used for logging context growth between rounds.
+ */
+function estimateMessageChars(messages: LLMMessage[]): number {
+  let total = 0;
+  for (const msg of messages) {
+    if (typeof msg.content === 'string') {
+      total += msg.content.length;
+    } else if (Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (block.type === 'text') {
+          total += (block as { text: string }).text.length;
+        } else if (block.type === 'tool_result') {
+          total += ((block as { content?: string }).content ?? '').length;
+        } else if (block.type === 'tool_use') {
+          total += JSON.stringify((block as { input: unknown }).input).length;
+        }
+      }
+    }
+  }
+  return total;
 }
 
 /**
@@ -284,14 +308,22 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
     }));
 
     // Build initial messages
+    const initialPrompt = this.buildInitialPrompt(diff, stats, fileContents);
     const messages: LLMMessage[] = [
       {
         role: 'user',
-        content: this.buildInitialPrompt(diff, stats, fileContents),
+        content: initialPrompt,
       },
     ];
 
+    const initialPromptChars = initialPrompt.length;
+    debug(
+      'perf',
+      `Initial prompt: ${initialPromptChars.toLocaleString()} chars (~${Math.ceil(initialPromptChars / CHARS_PER_TOKEN).toLocaleString()} tokens)`,
+    );
+
     // Run conversation loop
+    const endReviewLoop = timer('perf', 'conversation loop (all turns)');
     let turnNumber = 0;
 
     if (spinner) {
@@ -306,9 +338,17 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
       tools,
       messages,
     });
-    endFirstCall();
+    const firstCallMs = endFirstCall();
 
     tracker.addUsage(response.usage.inputTokens, response.usage.outputTokens);
+    tracker.addTurn({
+      turn: turnNumber,
+      inputTokens: response.usage.inputTokens,
+      outputTokens: response.usage.outputTokens,
+      apiTimeMs: firstCallMs,
+      toolTimeMs: 0,
+      toolResultChars: 0,
+    });
     debug(
       'llm',
       `Turn ${turnNumber}: stopReason=${response.stopReason}, tokens=${response.usage.inputTokens}in/${response.usage.outputTokens}out`,
@@ -352,9 +392,23 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
           };
         }),
       );
-      endToolCalls();
+      const toolCallMs = endToolCalls();
+
+      // Measure tool result sizes added to context
+      const toolResultChars = toolResults.reduce((sum, r) => sum + (r.content?.length ?? 0), 0);
+      debug(
+        'perf',
+        `Tool round ${toolRounds}: ${toolResults.length} result(s), ${toolResultChars.toLocaleString()} chars (~${Math.ceil(toolResultChars / CHARS_PER_TOKEN).toLocaleString()} tokens) added to context`,
+      );
 
       messages.push({ role: 'user', content: toolResults });
+
+      // Estimate total message payload before next API call
+      const messagePayloadChars = estimateMessageChars(messages);
+      debug(
+        'perf',
+        `Message payload before turn ${turnNumber + 1}: ~${Math.ceil(messagePayloadChars / CHARS_PER_TOKEN).toLocaleString()} tokens (${messagePayloadChars.toLocaleString()} chars)`,
+      );
 
       // Determine whether to allow more tool calls or force a final answer
       const atLimit = toolRounds >= MAX_TOOL_ROUNDS;
@@ -378,20 +432,36 @@ Analyzing ${stats.filesChanged} files. Use the available tools to understand the
         ...(atLimit ? {} : { tools }),
         messages,
       });
-      endApiCall();
+      const apiCallMs = endApiCall();
 
       tracker.addUsage(response.usage.inputTokens, response.usage.outputTokens);
+      tracker.addTurn({
+        turn: turnNumber,
+        inputTokens: response.usage.inputTokens,
+        outputTokens: response.usage.outputTokens,
+        apiTimeMs: apiCallMs,
+        toolTimeMs: toolCallMs,
+        toolResultChars,
+      });
       debug(
         'llm',
         `Turn ${turnNumber}: stopReason=${response.stopReason}, tokens=${response.usage.inputTokens}in/${response.usage.outputTokens}out`,
       );
     }
 
+    const totalReviewMs = endReviewLoop();
+
     if (spinner) {
       spinner.text = 'Parsing review output...';
     }
 
     debug('llm', `Conversation complete after ${turnNumber} turn(s)`);
+
+    // Emit per-round performance report
+    logPerformanceReport(tracker.getTurns(), {
+      initialPromptChars,
+      totalReviewMs,
+    });
 
     // Parse final response
     const textContent = response.content.find((b) => b.type === 'text');

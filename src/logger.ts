@@ -77,3 +77,65 @@ export function logTimingSummary(timings: Record<string, number>): void {
   console.error(`[perf]   Total: ${total.toFixed(0)}ms`);
   console.error('[perf] ────────────────────');
 }
+
+interface TurnReportEntry {
+  turn: number;
+  inputTokens: number;
+  outputTokens: number;
+  apiTimeMs: number;
+  toolTimeMs: number;
+  toolResultChars: number;
+}
+
+/**
+ * Log a per-round performance report at the end of a review.
+ *
+ * Shows API call time vs tool execution time per round, input token growth,
+ * and tool result sizes — everything needed to identify whether context
+ * growth is the bottleneck.
+ */
+export function logPerformanceReport(
+  turns: TurnReportEntry[],
+  extras: { initialPromptChars: number; totalReviewMs: number },
+): void {
+  if (!isEnabled()) return;
+
+  const fmt = (n: number) => n.toLocaleString('en-US');
+  const estTokens = (chars: number) => Math.ceil(chars / 4);
+
+  console.error('\n[perf] ═══ Performance Report ═══');
+  console.error(
+    `[perf]   Initial prompt: ~${fmt(estTokens(extras.initialPromptChars))} tokens (${fmt(extras.initialPromptChars)} chars)`,
+  );
+
+  let prevInput = 0;
+  let totalApiMs = 0;
+  let totalToolMs = 0;
+
+  for (const t of turns) {
+    const inputGrowth = prevInput > 0 ? ` (+${fmt(t.inputTokens - prevInput)})` : '';
+    const toolInfo =
+      t.toolTimeMs > 0
+        ? ` | Tools=${t.toolTimeMs.toFixed(0)}ms (${fmt(t.toolResultChars)} chars added)`
+        : '';
+    console.error(
+      `[perf]   Turn ${t.turn}: API=${t.apiTimeMs.toFixed(0)}ms | In=${fmt(t.inputTokens)}${inputGrowth} | Out=${fmt(t.outputTokens)}${toolInfo}`,
+    );
+    prevInput = t.inputTokens;
+    totalApiMs += t.apiTimeMs;
+    totalToolMs += t.toolTimeMs;
+  }
+
+  console.error('[perf]   ───');
+  console.error(
+    `[perf]   Totals: API=${totalApiMs.toFixed(0)}ms | Tools=${totalToolMs.toFixed(0)}ms | Wall=${extras.totalReviewMs.toFixed(0)}ms`,
+  );
+  const apiPct =
+    extras.totalReviewMs > 0 ? ((totalApiMs / extras.totalReviewMs) * 100).toFixed(0) : '0';
+  const toolPct =
+    extras.totalReviewMs > 0 ? ((totalToolMs / extras.totalReviewMs) * 100).toFixed(0) : '0';
+  console.error(
+    `[perf]   Breakdown: API=${apiPct}% | Tools=${toolPct}% | Overhead=${(100 - Number(apiPct) - Number(toolPct)).toFixed(0)}%`,
+  );
+  console.error('[perf] ═════════════════════════════');
+}
