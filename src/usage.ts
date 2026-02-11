@@ -4,6 +4,15 @@ interface TokenUsage {
   estimatedCost: number;
 }
 
+export interface TurnRecord {
+  turn: number;
+  inputTokens: number;
+  outputTokens: number;
+  apiTimeMs: number;
+  toolTimeMs: number;
+  toolResultChars: number;
+}
+
 interface ModelPricing {
   inputPerMTok: number;
   outputPerMTok: number;
@@ -23,6 +32,8 @@ const DEFAULT_PRICING: ModelPricing = { inputPerMTok: 1, outputPerMTok: 5 };
 
 export interface UsageTracker {
   addUsage(inputTokens: number, outputTokens: number): void;
+  addTurn(record: TurnRecord): void;
+  getTurns(): TurnRecord[];
   getTotal(): TokenUsage;
   formatUsage(): string;
 }
@@ -31,6 +42,7 @@ export function createUsageTracker(model: string): UsageTracker {
   const pricing = MODEL_PRICING[model] ?? DEFAULT_PRICING;
   let totalInput = 0;
   let totalOutput = 0;
+  const turns: TurnRecord[] = [];
 
   function calculateCost(inputTokens: number, outputTokens: number): number {
     const inputCost = (inputTokens / 1_000_000) * pricing.inputPerMTok;
@@ -42,6 +54,14 @@ export function createUsageTracker(model: string): UsageTracker {
     addUsage(inputTokens: number, outputTokens: number): void {
       totalInput += inputTokens;
       totalOutput += outputTokens;
+    },
+
+    addTurn(record: TurnRecord): void {
+      turns.push(record);
+    },
+
+    getTurns(): TurnRecord[] {
+      return [...turns];
     },
 
     getTotal(): TokenUsage {
