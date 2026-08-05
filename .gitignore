@@ -37,3 +37,8 @@ pnpm-lock.yaml
 
 # Usage history
 .mcp-review-history.json
+
+# Benchmark raw run output. Keep checked-in analysis/summaries small and readable.
+benchmarks/**/*.json
+benchmarks/**/*_timing.txt
+benchmarks/**/*.log
