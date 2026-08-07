@@ -1,5 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
+import { extractImportSpecifiers } from '../import-scan.js';
 
 export interface FindImportersArgs {
   file_path: string;
@@ -119,10 +120,6 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
   const matches: ImportMatch[] = [];
   const maxMatches = 50;
 
-  // Regex for import/require statements
-  const importRegex =
-    /(?:import\s+.*?from\s+['"](.+?)['"]|import\s*\(\s*['"](.+?)['"]\s*\)|require\s*\(\s*['"](.+?)['"]\s*\))/g;
-
   for (const file of files) {
     if (matches.length >= maxMatches) break;
 
@@ -144,17 +141,7 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
       const line = lines[i];
       if (line === undefined) continue;
 
-      // Reset regex state
-      importRegex.lastIndex = 0;
-      let match: RegExpExecArray | null = importRegex.exec(line);
-
-      while (match !== null) {
-        const importPath = match[1] ?? match[2] ?? match[3];
-        if (importPath === undefined) {
-          match = importRegex.exec(line);
-          continue;
-        }
-
+      for (const importPath of extractImportSpecifiers(line)) {
         // Check if this import resolves to our target file
         if (importMatchesTarget(importPath, file, targets, root)) {
           const relFile = relative(root, file);
@@ -165,7 +152,6 @@ export async function handleFindImporters(args: FindImportersArgs): Promise<stri
           });
           break; // One match per line is enough
         }
-        match = importRegex.exec(line);
       }
     }
   }
@@ -259,10 +245,13 @@ export async function handleFindExports(args: FindExportsArgs): Promise<string> 
     if (listMatch?.[1]) {
       const names = listMatch[1]
         .split(',')
+        // `\bas\b` rather than `\s+as\s+`: the two `\s+` runs around a literal
+        // let the engine split whitespace ambiguously, which backtracks
+        // super-linearly on a long export list (SonarQube S5852).
         .map((n) =>
           n
             .trim()
-            .split(/\s+as\s+/)
+            .split(/\bas\b/)
             .pop()
             ?.trim(),
         )

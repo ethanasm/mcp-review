@@ -1,5 +1,6 @@
 import { readFile as fsReadFile, readdir, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
+import { extractImportSpecifiers } from '../import-scan.js';
 
 export interface ReadFileArgs {
   path: string;
@@ -206,8 +207,6 @@ async function findImportersSimple(
 
   const sourceFiles = await collectSourceFilesForImporters(projectRoot, 300);
   const matches: { file: string; line: number; statement: string }[] = [];
-  const importRegex =
-    /(?:import\s+.*?from\s+['"](.+?)['"]|import\s*\(\s*['"](.+?)['"]\s*\)|require\s*\(\s*['"](.+?)['"]\s*\))/g;
 
   for (const sf of sourceFiles) {
     if (matches.length >= 30) break;
@@ -226,15 +225,7 @@ async function findImportersSimple(
       const ln = sfLines[i];
       if (ln === undefined) continue;
 
-      importRegex.lastIndex = 0;
-      let m: RegExpExecArray | null = importRegex.exec(ln);
-      while (m !== null) {
-        const importPath = m[1] ?? m[2] ?? m[3];
-        if (!importPath) {
-          m = importRegex.exec(ln);
-          continue;
-        }
-
+      for (const importPath of extractImportSpecifiers(ln)) {
         if (importPath.startsWith('.')) {
           const sourceDir = dirname(sf);
           const resolved = relative(projectRoot, resolve(sourceDir, importPath));
@@ -254,7 +245,6 @@ async function findImportersSimple(
           matches.push({ file: relative(projectRoot, sf), line: i + 1, statement: ln.trim() });
           break;
         }
-        m = importRegex.exec(ln);
       }
     }
   }
