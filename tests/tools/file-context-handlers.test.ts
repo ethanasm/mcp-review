@@ -202,6 +202,55 @@ describe('handleGetFileContext', () => {
     expect(result).toContain('## Imported By');
   });
 
+  it('lists the files that import the target', async () => {
+    // `vi.clearAllMocks()` keeps queued `mockResolvedValueOnce` values, and
+    // earlier tests leave some unconsumed — reset so this test's own
+    // implementation is the one that answers.
+    vi.mocked(readdir).mockReset();
+    vi.mocked(readFile).mockReset();
+
+    vi.mocked(readFile).mockImplementation(async (path) => {
+      const p = String(path);
+      if (p.endsWith('consumer.ts')) {
+        return "import { foo } from './target.js';\nconsole.log(foo);\n";
+      }
+      if (p.endsWith('bare.ts')) {
+        return "const foo = require('src/target');\n";
+      }
+      if (p.endsWith('unrelated.ts')) {
+        return "import { z } from 'zod';\n";
+      }
+      return 'export const foo = 42;\n';
+    });
+
+    vi.mocked(readdir).mockImplementation(async (dir) => {
+      if (String(dir) === '/project') {
+        return [mockDirent('src', true), mockDirent('node_modules', true)] as never;
+      }
+      if (String(dir) === '/project/src') {
+        return [
+          mockDirent('target.ts', false),
+          mockDirent('consumer.ts', false),
+          mockDirent('bare.ts', false),
+          mockDirent('unrelated.ts', false),
+          mockDirent('README.md', false),
+        ] as never;
+      }
+      throw new Error(`unexpected readdir: ${dir}`);
+    });
+
+    const result = await handleGetFileContext({
+      path: '/project/src/target.ts',
+      project_root: '/project',
+      include_importers: true,
+    });
+
+    expect(result).toContain('## Imported By (2)');
+    expect(result).toContain("src/consumer.ts:1: import { foo } from './target.js';");
+    expect(result).toContain("src/bare.ts:1: const foo = require('src/target');");
+    expect(result).not.toContain('unrelated.ts');
+  });
+
   it('skips importers section when include_importers is false', async () => {
     vi.mocked(readFile).mockResolvedValue('export const foo = 42;\n');
 

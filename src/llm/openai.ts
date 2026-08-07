@@ -60,6 +60,32 @@ interface OpenAIChatResponse {
 }
 
 /**
+ * Drop any trailing `/` characters.
+ *
+ * A scan rather than `replace(/\/+$/, '')`: an anchored `+` makes the engine
+ * retry the run from every position in the string, so a pathological base URL
+ * costs quadratic time (SonarQube S5852).
+ */
+function stripTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === '/') {
+    end--;
+  }
+  return url.slice(0, end);
+}
+
+/**
+ * Resolve the chat-completions endpoint for an OpenAI-compatible base URL.
+ *
+ * A base URL that already points at `/chat/completions` is used as given;
+ * anything else gets the path appended to its slash-trimmed form.
+ */
+export function resolveChatCompletionsEndpoint(baseURL: string): string {
+  const trimmed = stripTrailingSlashes(baseURL);
+  return trimmed.endsWith('/chat/completions') ? baseURL : `${trimmed}/chat/completions`;
+}
+
+/**
  * OpenAI-compatible provider.
  *
  * Works with OpenRouter, DeepSeek, Kimi, and any endpoint implementing
@@ -72,9 +98,7 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
     throw new Error('OpenAI provider requires a non-empty API key');
   }
   // Ensure the URL ends with /chat/completions
-  const endpoint = baseURL.replace(/\/+$/, '').endsWith('/chat/completions')
-    ? baseURL
-    : `${baseURL.replace(/\/+$/, '')}/chat/completions`;
+  const endpoint = resolveChatCompletionsEndpoint(baseURL);
 
   async function fetchWithRetry(body: Record<string, unknown>): Promise<OpenAIChatResponse> {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
