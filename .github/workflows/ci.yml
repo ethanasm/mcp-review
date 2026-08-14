@@ -30,3 +30,14 @@ jobs:
 
       - name: Test with coverage
         run: bun run test:coverage
+
+      # Packs the tarball, installs it into a throwaway project and runs the CLI
+      # as a consumer. The suite above imports tool servers from src/, so it stays
+      # green even when the published package cannot spawn them.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Packaging smoke test
+        run: npm run test:pack

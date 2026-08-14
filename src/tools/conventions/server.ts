@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { VERSION } from '../../version.js';
 import {
   handleFindSimilarPatterns,
   handleGetProjectConventions,
@@ -8,7 +9,7 @@ import {
 } from './handlers.js';
 
 const server = new McpServer(
-  { name: 'conventions', version: '0.1.0' },
+  { name: 'conventions', version: VERSION },
   { capabilities: { tools: {} } },
 );
 

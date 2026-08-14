@@ -6,6 +6,7 @@ import { loadConfig } from './config.js';
 import { resolve } from './git/resolver.js';
 import { formatUsageReport, getUsageHistory } from './history.js';
 import { createReviewer } from './reviewer.js';
+import { VERSION } from './version.js';
 
 // Load environment variables
 config();
@@ -15,7 +16,7 @@ const program = new Command();
 program
   .name('mcp-review')
   .description('Context-aware, AI-powered code review at the commit level')
-  .version('0.1.0')
+  .version(VERSION)
   .argument('[range]', 'Git revision range to review (e.g., HEAD~1..HEAD, abc123)')
   .option('--staged', 'Review staged changes (pre-commit mode)')
   .option('--last <n>', 'Review the last N commits', Number.parseInt)
