@@ -13,7 +13,7 @@
   "type": "module",
   "main": "dist/cli.js",
   "bin": {
-    "mcp-review": "./bin/mcp-review"
+    "mcp-review": "bin/mcp-review"
   },
   "files": [
     "dist",
