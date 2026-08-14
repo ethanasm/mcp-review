@@ -32,6 +32,37 @@ trap cleanup EXIT
 pass() { printf "  ${GREEN}✓${RESET} %s\n" "$1"; }
 fail() { printf "  ${RED}✗${RESET} %s\n" "$1"; failed=1; }
 
+# `timeout` is GNU coreutils and is absent from stock macOS, where Homebrew
+# installs it as `gtimeout`. Without this, every timed step died with
+# "command not found" and produced empty output — which read as a tool-server
+# failure here and, worse, as a *pass* in the CLI check below.
+# Export TIMEOUT_BIN= (empty) to force the pure-bash fallback.
+TIMEOUT_BIN="${TIMEOUT_BIN-$(command -v timeout || command -v gtimeout || true)}"
+
+run_with_timeout() {
+  local secs="$1"
+  shift
+  if [ -n "$TIMEOUT_BIN" ]; then
+    "$TIMEOUT_BIN" "$secs" "$@"
+    return $?
+  fi
+  # `<&0` is load-bearing: bash redirects an async command's stdin from
+  # /dev/null unless it carries an explicit redirection, which would starve a
+  # server of the request being piped into it.
+  "$@" <&0 &
+  local pid=$!
+  (
+    sleep "$secs"
+    kill -9 "$pid" 2>/dev/null
+  ) &
+  local watchdog=$!
+  local rc=0
+  wait "$pid" 2>/dev/null || rc=$?
+  kill -9 "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  return $rc
+}
+
 printf "${BOLD}Packaging smoke test${RESET}\n"
 printf "${DIM}workdir: %s${RESET}\n" "$WORKDIR"
 
@@ -74,17 +105,27 @@ fi
 # ── 3. Every tool server must exist compiled and speak MCP ───────────────────
 printf "\n${BLUE}${BOLD}▶ Tool servers${RESET}\n"
 INIT_REQ='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}'
+printf '%s\n' "$INIT_REQ" > "$WORKDIR/init.json"
 for server in git-diff file-context conventions related-files; do
   entry="$PKG_DIR/dist/tools/$server/server.js"
   if [ ! -f "$entry" ]; then
     fail "$server: dist/tools/$server/server.js missing from the tarball"
     continue
   fi
-  reply="$(printf '%s\n' "$INIT_REQ" | timeout 30 node "$entry" 2>/dev/null | head -1)"
+  # stderr is captured rather than discarded: when this check fails, the reason
+  # is almost always on stderr, and swallowing it leaves "<empty>" as the only
+  # evidence — which is no evidence at all.
+  reply="$(run_with_timeout 30 node "$entry" < "$WORKDIR/init.json" 2>"$WORKDIR/$server.err" | head -1)"
   if printf '%s' "$reply" | grep -q '"serverInfo"'; then
     pass "$server: responds to MCP initialize under plain node"
   else
     fail "$server: no valid initialize response (got: ${reply:-<empty>})"
+    if [ -s "$WORKDIR/$server.err" ]; then
+      printf "      ${DIM}stderr:${RESET}\n"
+      head -5 "$WORKDIR/$server.err" | sed 's/^/        /'
+    else
+      printf "      ${DIM}(no stderr — the process produced nothing at all)${RESET}\n"
+    fi
   fi
 done
 
@@ -102,14 +143,23 @@ printf 'export const answer = 42;\n' > sample.ts
 git add -A
 git commit -qm "add sample" >/dev/null 2>&1
 
+# Provider and model are pinned so an ambient MCP_REVIEW_MODEL / provider key in
+# the operator's shell can't reroute this to a provider whose key is absent —
+# the CLI would then exit before starting any server.
 OUTPUT="$(ANTHROPIC_API_KEY=sk-smoke-test-not-a-real-key \
-  timeout 120 "$CONSUMER/node_modules/.bin/mcp-review" HEAD~0..HEAD 2>&1)"
+  run_with_timeout 120 "$CONSUMER/node_modules/.bin/mcp-review" HEAD~0..HEAD \
+  --provider anthropic --model claude-sonnet-4-20250514 --verbose 2>&1)"
 
-if printf '%s' "$OUTPUT" | grep -q 'Failed to start'; then
-  fail "CLI reported tool server startup failures:"
-  printf '%s\n' "$OUTPUT" | grep 'Failed to start' | sed 's/^/      /'
+# Assert positively on the number of servers that reported a successful start.
+# The previous check only asserted the *absence* of "Failed to start", so any
+# run that produced no output at all — a missing `timeout`, a CLI that died
+# before reaching startup — passed while proving nothing.
+STARTED="$(printf '%s\n' "$OUTPUT" | grep -c '✓ start server:' || true)"
+if [ "$STARTED" -eq 4 ]; then
+  pass "CLI started all 4 tool servers"
 else
-  pass "CLI started every tool server"
+  fail "CLI started $STARTED/4 tool servers"
+  printf '%s\n' "$OUTPUT" | grep -E 'Failed to start|Error|error' | head -5 | sed 's/^/      /'
 fi
 
 # `--version` must reflect package.json rather than a hardcoded literal.
