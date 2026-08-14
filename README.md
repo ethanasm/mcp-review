@@ -4,6 +4,39 @@ Context-aware, AI-powered code review at the commit level. Works with local git 
 
 Built as an MCP Host that orchestrates tool servers to gather context from your codebase and feeds it to an LLM for intelligent, project-specific reviews.
 
+## Install
+
+Published to npm as **`mcp-git-reviewer`**; the command it installs is **`mcp-review`**.
+
+Run it without installing anything:
+
+```bash
+npx mcp-git-reviewer --staged
+```
+
+Or install it globally so `mcp-review` is on your PATH in every repo:
+
+```bash
+npm install -g mcp-git-reviewer
+mcp-review --staged
+```
+
+Requires **Node.js 20+** and an API key for whichever provider you use. Export it
+in your shell, or put it in a `.env` file in the repo you are reviewing:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...   # default provider
+```
+
+| Variable | Provider |
+|----------|----------|
+| `ANTHROPIC_API_KEY` | Anthropic (default) |
+| `OPENROUTER_API_KEY` | OpenRouter models (`qwen3-coder`, etc.) |
+| `DEEPSEEK_API_KEY` | DeepSeek |
+| `MOONSHOT_API_KEY` | Kimi / Moonshot |
+
+Then run it from inside any git repository — see [Usage](#usage).
+
 ## What's in the box
 
 ```
@@ -15,6 +48,7 @@ src/
   cache.ts                Hash-based review caching
   usage.ts                Token usage tracking and cost estimation
   errors.ts               Typed error hierarchy (ToolServerError, ApiError, etc.)
+  version.ts              Package version, read from package.json at runtime
   git/
     resolver.ts           Translates user input to git revision ranges
     commands.ts           simple-git wrappers (diff, blame, log)
@@ -53,7 +87,9 @@ src/
 | Test | Vitest |
 | CI | GitHub Actions, SonarCloud |
 
-## Setup
+## Local development setup
+
+To work on the tool itself (to just *use* it, see [Install](#install) above):
 
 ```bash
 # Install bun (if not already installed)
@@ -78,9 +114,9 @@ DEEPSEEK_API_KEY=sk-...        # For DeepSeek
 MOONSHOT_API_KEY=sk-...        # For Kimi / Moonshot
 ```
 
-### Global install
+### Linking a local checkout
 
-Link the CLI so you can run `mcp-review` from any git repository:
+Link your working copy so `mcp-review` runs your local build from any git repository:
 
 ```bash
 npm link
@@ -140,6 +176,20 @@ bun run verify
 ```
 
 This runs lint, format check, typecheck, build, and tests — with a pass/fail summary at the end.
+
+## Publishing
+
+```bash
+npm run verify        # lint, typecheck, build, unit tests
+npm run test:pack     # packs, installs the tarball, runs the CLI as a consumer
+npm version <patch|minor|major>
+npm publish           # prepublishOnly rebuilds dist/
+```
+
+`test:pack` is the gate that matters before a release: the unit tests import the
+tool servers from `src/`, so they stay green even if the *published* package
+cannot spawn them. The smoke test installs the real tarball and asserts all four
+servers start under plain `node`.
 
 ## Usage
 
@@ -272,4 +322,4 @@ Reviews are cached by content hash. Repeated reviews of the same diff skip the A
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

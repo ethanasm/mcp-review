@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { VERSION } from '../../version.js';
 import {
   handleGetFileContext,
   handleListDirectory,
@@ -9,7 +10,7 @@ import {
 } from './handlers.js';
 
 const server = new McpServer(
-  { name: 'file-context', version: '0.1.0' },
+  { name: 'file-context', version: VERSION },
   { capabilities: { tools: {} } },
 );
 

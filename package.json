@@ -2,11 +2,26 @@
   "name": "mcp-git-reviewer",
   "version": "0.1.0",
   "description": "Context-aware, AI-powered code review at the commit level using MCP",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ethanasm/mcp-review.git"
+  },
+  "homepage": "https://github.com/ethanasm/mcp-review#readme",
+  "bugs": {
+    "url": "https://github.com/ethanasm/mcp-review/issues"
+  },
   "type": "module",
   "main": "dist/cli.js",
   "bin": {
-    "mcp-review": "./bin/mcp-review"
+    "mcp-review": "bin/mcp-review"
   },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE",
+    ".mcp-review.yml.example"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "bun src/cli.ts",
@@ -20,7 +35,8 @@
     "check": "biome ci src tests",
     "typecheck": "tsc --noEmit",
     "verify": "bash scripts/verify.sh",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:pack": "bash scripts/smoke-pack.sh"
   },
   "keywords": [
     "mcp",

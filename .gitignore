@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# npm pack / publish artifacts
+*.tgz
+
 # Environment
 .env
 .env.local

@@ -289,6 +289,7 @@ mcp-git-reviewer/
 ├── src/
 │   ├── cli.ts             # Entry point, arg parsing
 │   ├── config.ts          # Config file loading
+│   ├── version.ts         # Package version, read from package.json
 │   ├── reviewer.ts        # Review orchestration
 │   ├── output.ts          # Terminal formatting
 │   │
@@ -334,6 +335,32 @@ mcp-git-reviewer/
 
 ---
 
+## Packaging
+
+Published to npm as **`mcp-git-reviewer`**; the installed command is
+**`mcp-review`**. Two rules keep the published package working:
+
+1. **Tool servers must be spawnable from `dist/`.** `resolveRunner` in
+   `src/host/mcp-host.ts` spawns `process.execPath` on
+   `dist/tools/<name>/server.js` when running compiled, and falls back to local
+   `tsx` on `src/tools/<name>/server.ts` when running from source. Never point
+   the compiled path at `src/` or at `tsx` — `tsx` is a devDependency and `src/`
+   is excluded from the tarball by the `files` allowlist. Server startup
+   failures are deliberately non-fatal, so getting this wrong does not throw;
+   it silently produces reviews with no context tools at all.
+2. **`files` in package.json is an allowlist.** Ship `dist`, `bin`, `README.md`,
+   `LICENSE`, `.mcp-review.yml.example` — nothing else. Adding a new runtime
+   asset means adding it there.
+
+`npm run test:pack` (`scripts/smoke-pack.sh`) enforces both: it packs, installs
+the tarball into a clean project, asserts every tool server answers an MCP
+`initialize` under plain `node`, and runs the CLI end-to-end. Run it before any
+release — the unit tests import tool servers from `src/` and cannot catch a
+packaging break. CI runs it on every PR.
+
+Version is single-sourced from `package.json` via `src/version.ts`; don't
+hardcode version literals in the CLI or the MCP `serverInfo` blocks.
+
 ## Key Design Decisions
 
 1. **MCP Host Architecture** — Separation of concerns; LLM decides what context it needs, tools provide it
@@ -355,6 +382,9 @@ npm test -- tests/git/resolver.test.ts
 
 # Run with coverage
 npm run test:coverage
+
+# Packaging smoke test (pack → install → run as a consumer)
+npm run test:pack
 
 # Run in watch mode
 npm run test:watch

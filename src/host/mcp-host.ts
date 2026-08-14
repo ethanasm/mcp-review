@@ -4,6 +4,7 @@ import type { ResolvedRange } from '../git/resolver.js';
 import { createProvider, resolveModelAlias } from '../llm/index.js';
 import { debug, timer } from '../logger.js';
 import type { ReviewResult } from '../reviewer.js';
+import { VERSION } from '../version.js';
 import { ConversationManager } from './conversation.js';
 import type { ServerConfig } from './tool-registry.js';
 import { ToolRegistry } from './tool-registry.js';
@@ -15,29 +16,57 @@ export interface MCPHostOptions extends Config {
 
 const DEFAULT_TOKEN_BUDGET = 100_000;
 
+const TOOL_SERVER_NAMES = ['git-diff', 'file-context', 'conventions', 'related-files'] as const;
+
 /**
- * Resolve the command + args for spawning a TypeScript file.
- * Prefers local `tsx` (from node_modules/.bin) for speed, falls back to `npx tsx`.
+ * Whether this module is running as compiled JavaScript (`dist/`) rather than
+ * TypeScript source. Published installs always run compiled, since `tsx` is a
+ * devDependency and `src/` is not shipped.
  */
-function resolveRunner(projectRoot: string): {
-  command: string;
-  args: (serverPath: string) => string[];
-} {
-  const localTsx = resolve(projectRoot, 'node_modules', '.bin', 'tsx');
+const RUNNING_COMPILED = import.meta.url.endsWith('.js');
+
+/**
+ * Resolve the command + args used to spawn a tool server.
+ *
+ * Compiled (published installs, `npm start`): spawn the *current* Node binary on
+ * the sibling `dist/tools/<name>/server.js`. This is the path that matters for
+ * consumers — `tsx` is a devDependency and `src/` is excluded from the published
+ * tarball, so a `tsx`-based runner fails with ENOENT for every server, and
+ * because startup failures are non-fatal (see `initialize`) that surfaces as a
+ * context-free review rather than an error.
+ *
+ * Source (`bun src/cli.ts`, vitest): spawn the local `tsx` binary on the sibling
+ * `src/tools/<name>/server.ts`, preserving the no-build dev loop.
+ */
+function resolveRunner(): { command: string; args: (serverPath: string) => string[] } {
+  if (RUNNING_COMPILED) {
+    // process.execPath, not a bare "node" — respects nvm/volta/asdf shims and
+    // whichever runtime actually launched the CLI.
+    return { command: process.execPath, args: (serverPath: string) => [serverPath] };
+  }
+  const projectRoot = resolve(import.meta.dirname, '..', '..');
   // Using the local tsx binary directly avoids npx resolution overhead
+  const localTsx = resolve(projectRoot, 'node_modules', '.bin', 'tsx');
   return { command: localTsx, args: (serverPath: string) => [serverPath] };
 }
 
 /**
  * Server configurations for all tool servers.
- * Paths are relative to the project src directory.
+ *
+ * Paths are resolved relative to *this module's* directory rather than a guessed
+ * project root, so the same code locates `dist/tools/**` when compiled and
+ * `src/tools/**` when running from source.
  */
-const TOOL_SERVERS: ServerConfig[] = [
-  { name: 'git-diff', path: 'src/tools/git-diff/server.ts' },
-  { name: 'file-context', path: 'src/tools/file-context/server.ts' },
-  { name: 'conventions', path: 'src/tools/conventions/server.ts' },
-  { name: 'related-files', path: 'src/tools/related-files/server.ts' },
-];
+const TOOL_SERVERS: ServerConfig[] = TOOL_SERVER_NAMES.map((name) => ({
+  name,
+  path: resolve(
+    import.meta.dirname,
+    '..',
+    'tools',
+    name,
+    RUNNING_COMPILED ? 'server.js' : 'server.ts',
+  ),
+}));
 
 /**
  * MCP Host Runtime
@@ -82,14 +111,12 @@ export class MCPHost {
     if (this.initialized) return;
 
     const endInit = timer('mcp-host', 'server initialization (all servers)');
-    const projectRoot = resolve(import.meta.dirname, '..', '..');
-    const runner = resolveRunner(projectRoot);
+    const runner = resolveRunner();
 
     const results = await Promise.allSettled(
       TOOL_SERVERS.map(async (serverConfig) => {
         const endServer = timer('mcp-host', `start server: ${serverConfig.name}`);
-        const serverPath = resolve(projectRoot, serverConfig.path);
-        const transport = new StdioTransport(runner.command, runner.args(serverPath));
+        const transport = new StdioTransport(runner.command, runner.args(serverConfig.path));
 
         await transport.start();
 
@@ -97,7 +124,7 @@ export class MCPHost {
         await transport.request('initialize', {
           protocolVersion: '2024-11-05',
           capabilities: {},
-          clientInfo: { name: 'mcp-review-host', version: '0.1.0' },
+          clientInfo: { name: 'mcp-review-host', version: VERSION },
         });
 
         // Notify server that initialization is complete
