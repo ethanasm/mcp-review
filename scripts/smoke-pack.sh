@@ -32,35 +32,12 @@ trap cleanup EXIT
 pass() { printf "  ${GREEN}✓${RESET} %s\n" "$1"; }
 fail() { printf "  ${RED}✗${RESET} %s\n" "$1"; failed=1; }
 
-# `timeout` is GNU coreutils and is absent from stock macOS, where Homebrew
-# installs it as `gtimeout`. Without this, every timed step died with
-# "command not found" and produced empty output — which read as a tool-server
-# failure here and, worse, as a *pass* in the CLI check below.
-# Export TIMEOUT_BIN= (empty) to force the pure-bash fallback.
-TIMEOUT_BIN="${TIMEOUT_BIN-$(command -v timeout || command -v gtimeout || true)}"
-
+# `timeout` is GNU coreutils and absent from stock macOS, so this uses a Node
+# implementation instead — Node is guaranteed present, being what we are
+# testing. See scripts/with-timeout.mjs for why the bash `( sleep N; kill ) &`
+# idiom is not a viable substitute. Exits 124 on timeout, like GNU timeout.
 run_with_timeout() {
-  local secs="$1"
-  shift
-  if [ -n "$TIMEOUT_BIN" ]; then
-    "$TIMEOUT_BIN" "$secs" "$@"
-    return $?
-  fi
-  # `<&0` is load-bearing: bash redirects an async command's stdin from
-  # /dev/null unless it carries an explicit redirection, which would starve a
-  # server of the request being piped into it.
-  "$@" <&0 &
-  local pid=$!
-  (
-    sleep "$secs"
-    kill -9 "$pid" 2>/dev/null
-  ) &
-  local watchdog=$!
-  local rc=0
-  wait "$pid" 2>/dev/null || rc=$?
-  kill -9 "$watchdog" 2>/dev/null
-  wait "$watchdog" 2>/dev/null
-  return $rc
+  node "$REPO_ROOT/scripts/with-timeout.mjs" "$@"
 }
 
 printf "${BOLD}Packaging smoke test${RESET}\n"
@@ -149,6 +126,15 @@ git commit -qm "add sample" >/dev/null 2>&1
 OUTPUT="$(ANTHROPIC_API_KEY=sk-smoke-test-not-a-real-key \
   run_with_timeout 120 "$CONSUMER/node_modules/.bin/mcp-review" HEAD~0..HEAD \
   --provider anthropic --model claude-sonnet-4-20250514 --verbose 2>&1)"
+CLI_RC=$?
+
+# 124 is the timeout exit code. Call it out by name rather than letting it look
+# like a startup failure — a CLI that runs but never exits is a different bug
+# from one that cannot spawn its servers.
+if [ "$CLI_RC" -eq 124 ]; then
+  fail "CLI did not exit within 120s (killed). Last output:"
+  printf '%s\n' "$OUTPUT" | tail -5 | sed 's/^/      /'
+fi
 
 # Assert positively on the number of servers that reported a successful start.
 # The previous check only asserted the *absence* of "Failed to start", so any
